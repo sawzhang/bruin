@@ -13,6 +13,8 @@ export function Sidebar() {
   const { tagTree, selectedTag, selectTag } = useTags();
   const { createNote, showTrash, setShowTrash, loadNotes } = useNotes();
   const toggleThemePicker = useUIStore((s) => s.toggleThemePicker);
+  const toggleActivityPanel = useUIStore((s) => s.toggleActivityPanel);
+  const isActivityPanelOpen = useUIStore((s) => s.isActivityPanelOpen);
 
   const [syncStatus, setSyncStatus] = useState<SyncState>({
     is_syncing: false,
@@ -171,6 +173,27 @@ export function Sidebar() {
             <path d="M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1" />
           </svg>
           Trash
+        </button>
+        <button
+          onClick={toggleActivityPanel}
+          className={clsx(
+            "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
+            isActivityPanelOpen
+              ? "bg-bear-active text-bear-text"
+              : "text-bear-text-secondary hover:bg-bear-hover hover:text-bear-text",
+          )}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+          >
+            <path d="M2 3h10M2 7h7M2 11h5" />
+          </svg>
+          Activity
         </button>
       </div>
 

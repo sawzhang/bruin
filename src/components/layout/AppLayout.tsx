@@ -9,6 +9,8 @@ import { EditorPanel } from "./EditorPanel";
 import { Resizer } from "../common/Resizer";
 import { CommandPalette } from "../search/CommandPalette";
 import { ThemePicker } from "../settings/ThemePicker";
+import { ActivityPanel } from "../activity/ActivityPanel";
+import { TemplatePicker } from "../templates/TemplatePicker";
 
 export function AppLayout() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -16,6 +18,7 @@ export function AppLayout() {
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const setNoteListWidth = useUIStore((s) => s.setNoteListWidth);
   const theme = useUIStore((s) => s.theme);
+  const isActivityPanelOpen = useUIStore((s) => s.isActivityPanelOpen);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadTags = useTagStore((s) => s.loadTags);
 
@@ -48,9 +51,17 @@ export function AppLayout() {
         <EditorPanel />
       </div>
 
+      {/* Activity Panel */}
+      {isActivityPanelOpen && (
+        <div className="w-[280px] shrink-0 h-full border-l border-bear-border">
+          <ActivityPanel />
+        </div>
+      )}
+
       {/* Overlays */}
       <CommandPalette />
       <ThemePicker />
+      <TemplatePicker />
     </div>
   );
 }

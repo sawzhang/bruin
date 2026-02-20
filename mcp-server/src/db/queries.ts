@@ -16,6 +16,7 @@ export interface NoteRow {
   word_count: number;
   file_path: string | null;
   sync_hash: string | null;
+  state: string;
 }
 
 export interface TagRow {
@@ -29,8 +30,50 @@ export interface NoteWithTags extends NoteRow {
   tags: string[];
 }
 
+export interface ActivityEventRow {
+  id: number;
+  actor: string;
+  event_type: string;
+  note_id: string | null;
+  timestamp: string;
+  summary: string;
+  data: string;
+}
+
 function now(): string {
   return new Date().toISOString();
+}
+
+export function logActivity(
+  actor: string,
+  eventType: string,
+  noteId: string | null,
+  summary: string,
+  data: string = "{}"
+): void {
+  db.prepare(
+    "INSERT INTO activity_events (actor, event_type, note_id, timestamp, summary, data) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(actor, eventType, noteId, now(), summary, data);
+  // Fire webhooks asynchronously
+  fireWebhooks(eventType, noteId, summary).catch(() => {});
+}
+
+export function getActivityFeed(
+  limit = 50,
+  noteId?: string
+): ActivityEventRow[] {
+  if (noteId) {
+    return db
+      .prepare(
+        "SELECT * FROM activity_events WHERE note_id = ? ORDER BY timestamp DESC LIMIT ?"
+      )
+      .all(noteId, limit) as ActivityEventRow[];
+  }
+  return db
+    .prepare(
+      "SELECT * FROM activity_events ORDER BY timestamp DESC LIMIT ?"
+    )
+    .all(limit) as ActivityEventRow[];
 }
 
 function wordCount(content: string): number {
@@ -115,6 +158,8 @@ export function createNote(
 
   syncNoteTags(id, allTags);
 
+  logActivity("agent", "note_created", id, `Created note '${title}'`);
+
   return {
     id,
     title,
@@ -126,6 +171,7 @@ export function createNote(
     word_count: wc,
     file_path: null,
     sync_hash: null,
+    state: "draft",
     tags: allTags,
   };
 }
@@ -185,6 +231,8 @@ export function updateNote(
     syncNoteTags(id, extractTags(newContent));
   }
 
+  logActivity("agent", "note_updated", id, `Updated note '${newTitle}'`);
+
   return getNote(id);
 }
 
@@ -201,14 +249,48 @@ export function deleteNote(
   }
 
   if (permanent) {
+    logActivity("agent", "note_deleted", id, `Permanently deleted note '${id}'`);
     db.prepare("DELETE FROM notes WHERE id = ?").run(id);
     return { success: true, message: `Note '${id}' permanently deleted` };
   } else {
     db.prepare(
       "UPDATE notes SET is_trashed = 1, updated_at = ? WHERE id = ?"
     ).run(now(), id);
+    logActivity("agent", "note_trashed", id, `Moved note '${id}' to trash`);
     return { success: true, message: `Note '${id}' moved to trash` };
   }
+}
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  draft: ["review"],
+  review: ["published", "draft"],
+  published: ["review"],
+};
+
+export function setNoteState(
+  id: string,
+  state: string
+): NoteWithTags | null {
+  const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as
+    | NoteRow
+    | undefined;
+
+  if (!existing) return null;
+
+  const allowed = VALID_TRANSITIONS[existing.state] ?? [];
+  if (!allowed.includes(state)) {
+    throw new Error(
+      `Invalid state transition: '${existing.state}' → '${state}'`
+    );
+  }
+
+  db.prepare(
+    "UPDATE notes SET state = ?, updated_at = ? WHERE id = ?"
+  ).run(state, now(), id);
+
+  logActivity("agent", "state_changed", id, `Changed state '${existing.state}' → '${state}'`);
+
+  return getNote(id);
 }
 
 export function listNotes(
@@ -337,6 +419,8 @@ export function appendToNote(
 
   syncNoteTags(noteId, extractTags(newContent));
 
+  logActivity("agent", "note_updated", noteId, `Appended to note '${existing.title}'`);
+
   return getNote(noteId);
 }
 
@@ -417,6 +501,219 @@ export function importMarkdownFiles(
 
   transaction();
   return { imported, skipped };
+}
+
+// --- Templates ---
+
+export interface TemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  tags: string; // JSON array
+  initial_state: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateWithTags {
+  id: string;
+  name: string;
+  description: string;
+  content: string;
+  tags: string[];
+  initial_state: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function parseTemplate(row: TemplateRow): TemplateWithTags {
+  return {
+    ...row,
+    tags: JSON.parse(row.tags || "[]"),
+  };
+}
+
+export function listTemplates(): TemplateWithTags[] {
+  const rows = db
+    .prepare("SELECT * FROM templates ORDER BY name")
+    .all() as TemplateRow[];
+  return rows.map(parseTemplate);
+}
+
+export function createNoteFromTemplate(
+  templateId: string,
+  title?: string
+): NoteWithTags {
+  const row = db
+    .prepare("SELECT * FROM templates WHERE id = ?")
+    .get(templateId) as TemplateRow | undefined;
+
+  if (!row) throw new Error(`Template '${templateId}' not found`);
+
+  const template = parseTemplate(row);
+  const noteTitle = title ?? template.name;
+  const dateStr = new Date().toISOString().split("T")[0];
+
+  const content = template.content
+    .replace(/\{\{date\}\}/g, dateStr)
+    .replace(/\{\{title\}\}/g, noteTitle);
+
+  // Merge template tags with inline tags
+  const inlineTags = extractTags(content);
+  const allTags = [...new Set([...template.tags, ...inlineTags])];
+
+  const id = uuidv4();
+  const timestamp = now();
+  const wc = wordCount(content);
+
+  db.prepare(
+    `INSERT INTO notes (id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, state)
+     VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)`
+  ).run(id, noteTitle, content, timestamp, timestamp, wc, template.initial_state);
+
+  syncNoteTags(id, allTags);
+
+  logActivity("agent", "note_created", id, `Created note '${noteTitle}' from template '${template.name}'`);
+
+  return getNote(id)!;
+}
+
+// --- Webhooks ---
+
+export interface WebhookRow {
+  id: string;
+  url: string;
+  event_types: string; // JSON array
+  secret: string;
+  is_active: number;
+  created_at: string;
+  last_triggered_at: string | null;
+  failure_count: number;
+}
+
+export interface WebhookWithTypes {
+  id: string;
+  url: string;
+  event_types: string[];
+  secret: string;
+  is_active: boolean;
+  created_at: string;
+  last_triggered_at: string | null;
+  failure_count: number;
+}
+
+function parseWebhook(row: WebhookRow): WebhookWithTypes {
+  return {
+    ...row,
+    event_types: JSON.parse(row.event_types || "[]"),
+    is_active: row.is_active !== 0,
+  };
+}
+
+export function registerWebhook(
+  url: string,
+  eventTypes: string[],
+  secret: string
+): WebhookWithTypes {
+  const id = uuidv4();
+  const timestamp = now();
+  const eventTypesJson = JSON.stringify(eventTypes);
+
+  db.prepare(
+    "INSERT INTO webhooks (id, url, event_types, secret, created_at) VALUES (?, ?, ?, ?, ?)"
+  ).run(id, url, eventTypesJson, secret, timestamp);
+
+  return {
+    id,
+    url,
+    event_types: eventTypes,
+    secret,
+    is_active: true,
+    created_at: timestamp,
+    last_triggered_at: null,
+    failure_count: 0,
+  };
+}
+
+export function listWebhooks(): WebhookWithTypes[] {
+  const rows = db
+    .prepare("SELECT * FROM webhooks ORDER BY created_at DESC")
+    .all() as WebhookRow[];
+  return rows.map(parseWebhook);
+}
+
+export function deleteWebhook(id: string): { success: boolean; message: string } {
+  const existing = db.prepare("SELECT id FROM webhooks WHERE id = ?").get(id);
+  if (!existing) {
+    return { success: false, message: `Webhook '${id}' not found` };
+  }
+  db.prepare("DELETE FROM webhooks WHERE id = ?").run(id);
+  return { success: true, message: `Webhook '${id}' deleted` };
+}
+
+export async function fireWebhooks(
+  eventType: string,
+  noteId: string | null,
+  summary: string
+): Promise<void> {
+  const rows = db
+    .prepare("SELECT * FROM webhooks WHERE is_active = 1")
+    .all() as WebhookRow[];
+
+  for (const row of rows) {
+    const eventTypes: string[] = JSON.parse(row.event_types || "[]");
+    if (eventTypes.length > 0 && !eventTypes.includes(eventType)) {
+      continue;
+    }
+
+    const payload = JSON.stringify({
+      event_type: eventType,
+      note_id: noteId,
+      summary,
+      timestamp: now(),
+    });
+
+    // Compute HMAC-SHA256 signature
+    const { createHmac } = await import("crypto");
+    const signature = createHmac("sha256", row.secret)
+      .update(payload)
+      .digest("hex");
+
+    // Fire-and-forget with retries
+    (async () => {
+      let attempts = 0;
+      const maxRetries = 3;
+      while (attempts < maxRetries) {
+        try {
+          const response = await fetch(row.url, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Webhook-Signature": signature,
+            },
+            body: payload,
+          });
+          if (response.ok) {
+            db.prepare(
+              "UPDATE webhooks SET last_triggered_at = ?, failure_count = 0 WHERE id = ?"
+            ).run(now(), row.id);
+            return;
+          }
+        } catch {
+          // retry
+        }
+        attempts++;
+        if (attempts < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempts)));
+        }
+      }
+      // All retries failed
+      db.prepare(
+        "UPDATE webhooks SET failure_count = failure_count + 1 WHERE id = ?"
+      ).run(row.id);
+    })();
+  }
 }
 
 export interface AdvancedQueryFilters {

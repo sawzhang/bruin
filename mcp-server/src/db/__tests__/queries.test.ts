@@ -20,7 +20,8 @@ function createTestDb(): Database.Database {
       is_pinned INTEGER NOT NULL DEFAULT 0,
       word_count INTEGER NOT NULL DEFAULT 0,
       file_path TEXT,
-      sync_hash TEXT
+      sync_hash TEXT,
+      state TEXT NOT NULL DEFAULT 'draft'
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -61,6 +62,38 @@ function createTestDb(): Database.Database {
       key TEXT NOT NULL,
       value TEXT NOT NULL,
       PRIMARY KEY (note_id, key)
+    );
+
+    CREATE TABLE IF NOT EXISTS activity_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      actor TEXT NOT NULL DEFAULT 'user',
+      event_type TEXT NOT NULL,
+      note_id TEXT,
+      timestamp TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      data TEXT NOT NULL DEFAULT '{}'
+    );
+
+    CREATE TABLE IF NOT EXISTS templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL DEFAULT '',
+      tags TEXT NOT NULL DEFAULT '[]',
+      initial_state TEXT NOT NULL DEFAULT 'draft',
+      created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+      updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
+    );
+
+    CREATE TABLE IF NOT EXISTS webhooks (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      event_types TEXT NOT NULL DEFAULT '[]',
+      secret TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+      last_triggered_at TEXT,
+      failure_count INTEGER NOT NULL DEFAULT 0
     );
   `);
 
@@ -370,6 +403,125 @@ describe("getDailyNote", () => {
     const first = getDailyNote("2026-01-15");
     const second = getDailyNote("2026-01-15");
     expect(first.id).toBe(second.id);
+  });
+});
+
+// --- Phase 1: State Machine Tests ---
+
+describe("setNoteState", () => {
+  it("transitions draft to review", async () => {
+    const { createNote, setNoteState } = await getQueries();
+    const note = createNote("Note", "Content");
+    expect(note.state).toBe("draft");
+    const updated = setNoteState(note.id, "review");
+    expect(updated!.state).toBe("review");
+  });
+
+  it("transitions review to published", async () => {
+    const { createNote, setNoteState } = await getQueries();
+    const note = createNote("Note", "Content");
+    setNoteState(note.id, "review");
+    const published = setNoteState(note.id, "published");
+    expect(published!.state).toBe("published");
+  });
+
+  it("rejects invalid transitions", async () => {
+    const { createNote, setNoteState } = await getQueries();
+    const note = createNote("Note", "Content");
+    // draft → published is not valid
+    expect(() => setNoteState(note.id, "published")).toThrow();
+  });
+
+  it("returns null for non-existent note", async () => {
+    const { setNoteState } = await getQueries();
+    expect(setNoteState("bad-id", "review")).toBeNull();
+  });
+
+  it("defaults to draft state on create", async () => {
+    const { createNote } = await getQueries();
+    const note = createNote("Note", "Content");
+    expect(note.state).toBe("draft");
+  });
+});
+
+// --- Phase 2: Activity Feed Tests ---
+
+describe("activityFeed", () => {
+  it("logs activity from mutations", async () => {
+    const { createNote, getActivityFeed } = await getQueries();
+    createNote("Test", "Content");
+    const events = getActivityFeed();
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0].event_type).toBe("note_created");
+    expect(events[0].actor).toBe("agent");
+  });
+
+  it("filters by note_id", async () => {
+    const { createNote, getActivityFeed } = await getQueries();
+    const note1 = createNote("A", "Content A");
+    createNote("B", "Content B");
+    const events = getActivityFeed(50, note1.id);
+    expect(events.every((e: { note_id: string }) => e.note_id === note1.id)).toBe(true);
+  });
+});
+
+// --- Phase 3: Templates Tests ---
+
+describe("templates", () => {
+  it("lists templates (initially empty in test)", async () => {
+    const { listTemplates } = await getQueries();
+    const templates = listTemplates();
+    expect(Array.isArray(templates)).toBe(true);
+  });
+
+  it("creates note from template with variable expansion", async () => {
+    const { createNoteFromTemplate, getNote } = await getQueries();
+    // Insert a template manually
+    testDb.prepare(
+      "INSERT INTO templates (id, name, description, content, tags, initial_state, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run("tpl-1", "Test Template", "desc", "# {{title}}\n\nDate: {{date}}", '["test"]', "review", "2026-01-01T00:00:00Z", "2026-01-01T00:00:00Z");
+
+    const note = createNoteFromTemplate("tpl-1", "My Note");
+    expect(note.title).toBe("My Note");
+    expect(note.content).toContain("# My Note");
+    expect(note.content).toContain("Date: ");
+    expect(note.state).toBe("review");
+    expect(note.tags).toContain("test");
+  });
+
+  it("throws for non-existent template", async () => {
+    const { createNoteFromTemplate } = await getQueries();
+    expect(() => createNoteFromTemplate("bad-id")).toThrow();
+  });
+});
+
+// --- Phase 5: Webhook Tests ---
+
+describe("webhooks", () => {
+  it("registers and lists webhooks", async () => {
+    const { registerWebhook, listWebhooks } = await getQueries();
+    const wh = registerWebhook("https://example.com/hook", ["note_created"], "secret123");
+    expect(wh.url).toBe("https://example.com/hook");
+    expect(wh.event_types).toEqual(["note_created"]);
+    expect(wh.is_active).toBe(true);
+
+    const all = listWebhooks();
+    expect(all.length).toBe(1);
+    expect(all[0].id).toBe(wh.id);
+  });
+
+  it("deletes webhooks", async () => {
+    const { registerWebhook, deleteWebhook, listWebhooks } = await getQueries();
+    const wh = registerWebhook("https://example.com/hook", [], "secret");
+    const result = deleteWebhook(wh.id);
+    expect(result.success).toBe(true);
+    expect(listWebhooks().length).toBe(0);
+  });
+
+  it("returns failure for non-existent webhook", async () => {
+    const { deleteWebhook } = await getQueries();
+    const result = deleteWebhook("bad-id");
+    expect(result.success).toBe(false);
   });
 });
 

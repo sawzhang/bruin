@@ -15,6 +15,104 @@ fn compute_word_count(content: &str) -> i64 {
     content.split_whitespace().count() as i64
 }
 
+pub(crate) fn log_activity(
+    conn: &Connection,
+    actor: &str,
+    event_type: &str,
+    note_id: Option<&str>,
+    summary: &str,
+    data: &str,
+) {
+    let now = Utc::now().to_rfc3339();
+    let _ = conn.execute(
+        "INSERT INTO activity_events (actor, event_type, note_id, timestamp, summary, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![actor, event_type, note_id, now, summary, data],
+    );
+    fire_webhooks(conn, event_type, note_id, summary);
+}
+
+fn fire_webhooks(conn: &Connection, event_type: &str, note_id: Option<&str>, summary: &str) {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    let webhooks = conn
+        .prepare("SELECT id, url, event_types, secret FROM webhooks WHERE is_active = 1")
+        .and_then(|mut stmt| {
+            stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })
+            .and_then(|rows| rows.collect::<Result<Vec<_>, _>>())
+        });
+
+    let webhooks = match webhooks {
+        Ok(w) => w,
+        Err(_) => return,
+    };
+
+    for (wh_id, url, event_types_json, secret) in webhooks {
+        let event_types: Vec<String> =
+            serde_json::from_str(&event_types_json).unwrap_or_default();
+
+        // Skip if webhook doesn't subscribe to this event type (empty = all)
+        if !event_types.is_empty() && !event_types.contains(&event_type.to_string()) {
+            continue;
+        }
+
+        let payload = serde_json::json!({
+            "event_type": event_type,
+            "note_id": note_id,
+            "summary": summary,
+            "timestamp": Utc::now().to_rfc3339(),
+        });
+        let body = payload.to_string();
+
+        // Compute HMAC-SHA256 signature
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
+            .expect("HMAC key");
+        mac.update(body.as_bytes());
+        let signature = hex::encode(mac.finalize().into_bytes());
+
+        // Fire-and-forget with simple retry
+        let url_clone = url.clone();
+        let body_clone = body.clone();
+        let sig_clone = signature.clone();
+
+        std::thread::spawn(move || {
+            let mut attempts = 0;
+            let max_retries = 3;
+            loop {
+                let result = ureq::post(&url_clone)
+                    .set("Content-Type", "application/json")
+                    .set("X-Webhook-Signature", &sig_clone)
+                    .send_string(&body_clone);
+
+                match result {
+                    Ok(_) => break,
+                    Err(_) => {
+                        attempts += 1;
+                        if attempts >= max_retries {
+                            break;
+                        }
+                        // Exponential backoff: 1s, 2s, 4s
+                        std::thread::sleep(std::time::Duration::from_secs(1 << attempts));
+                    }
+                }
+            }
+        });
+
+        // Update last_triggered_at
+        let _ = conn.execute(
+            "UPDATE webhooks SET last_triggered_at = ?1 WHERE id = ?2",
+            rusqlite::params![Utc::now().to_rfc3339(), wh_id],
+        );
+    }
+}
+
 pub(crate) fn sync_tags(conn: &Connection, note_id: &str, tags: &[String]) -> Result<(), String> {
     conn.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])
         .map_err(|e| e.to_string())?;
@@ -66,7 +164,7 @@ pub(crate) fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<St
 pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash FROM notes WHERE id = ?1",
+            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash, state FROM notes WHERE id = ?1",
             [id],
             |row| {
                 Ok(Note {
@@ -81,6 +179,7 @@ pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
                     file_path: row.get(8)?,
                     sync_hash: row.get(9)?,
                     tags: vec![],
+                    state: row.get::<_, String>(10).unwrap_or_else(|_| "draft".to_string()),
                 })
             },
         )
@@ -122,6 +221,7 @@ pub fn create_note(
     sync_tags(&conn, &id, &tags)?;
     let note = fetch_note(&conn, &id)?;
     sync_to_icloud(&conn, &note);
+    log_activity(&conn, "user", "note_created", Some(&id), &format!("Created note '{}'", note.title), "{}");
     Ok(note)
 }
 
@@ -154,6 +254,7 @@ pub fn update_note(
     sync_tags(&conn, &params.id, &tags)?;
     let note = fetch_note(&conn, &params.id)?;
     sync_to_icloud(&conn, &note);
+    log_activity(&conn, "user", "note_updated", Some(&params.id), &format!("Updated note '{}'", note.title), "{}");
     Ok(note)
 }
 
@@ -166,6 +267,7 @@ pub fn delete_note(
     let conn = db.lock().map_err(|e| e.to_string())?;
 
     if permanent {
+        log_activity(&conn, "user", "note_deleted", Some(&id), &format!("Permanently deleted note '{}'", id), "{}");
         conn.execute("DELETE FROM note_tags WHERE note_id = ?1", [&id])
             .map_err(|e| e.to_string())?;
         conn.execute("DELETE FROM notes WHERE id = ?1", [&id])
@@ -181,6 +283,7 @@ pub fn delete_note(
             rusqlite::params![Utc::now().to_rfc3339(), id],
         )
         .map_err(|e| e.to_string())?;
+        log_activity(&conn, "user", "note_trashed", Some(&id), &format!("Moved note '{}' to trash", id), "{}");
     }
 
     Ok(())
@@ -201,7 +304,7 @@ pub fn list_notes(
     if let Some(ref tag) = params.tag {
         let mut stmt = conn
             .prepare(
-                "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count \
+                "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state \
                  FROM notes n \
                  JOIN note_tags nt ON n.id = nt.note_id \
                  JOIN tags t ON nt.tag_id = t.id \
@@ -228,6 +331,7 @@ pub fn list_notes(
                     is_trashed: row.get::<_, i32>(5)? != 0,
                     word_count: row.get(6)?,
                     tags: vec![],
+                    state: row.get::<_, String>(7).unwrap_or_else(|_| "draft".to_string()),
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -240,7 +344,7 @@ pub fn list_notes(
     } else {
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, content, updated_at, is_pinned, is_trashed, word_count \
+                "SELECT id, title, content, updated_at, is_pinned, is_trashed, word_count, state \
                  FROM notes \
                  WHERE is_trashed = ?1 \
                  ORDER BY is_pinned DESC, updated_at DESC \
@@ -265,6 +369,7 @@ pub fn list_notes(
                     is_trashed: row.get::<_, i32>(5)? != 0,
                     word_count: row.get(6)?,
                     tags: vec![],
+                    state: row.get::<_, String>(7).unwrap_or_else(|_| "draft".to_string()),
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -296,6 +401,8 @@ pub fn pin_note(
     if let Ok(note) = fetch_note(&conn, &id) {
         let _ = icloud::export_note(&note);
     }
+    let action = if pinned { "pinned" } else { "unpinned" };
+    log_activity(&conn, "user", "note_pinned", Some(&id), &format!("Note {} '{}'", action, id), "{}");
     Ok(())
 }
 
@@ -309,6 +416,7 @@ pub fn trash_note(db: State<'_, Mutex<Connection>>, id: String) -> Result<(), St
     .map_err(|e| e.to_string())?;
 
     let _ = icloud::delete_note_file(&id);
+    log_activity(&conn, "user", "note_trashed", Some(&id), &format!("Moved note '{}' to trash", id), "{}");
     Ok(())
 }
 
@@ -324,7 +432,47 @@ pub fn restore_note(db: State<'_, Mutex<Connection>>, id: String) -> Result<(), 
     if let Ok(note) = fetch_note(&conn, &id) {
         sync_to_icloud(&conn, &note);
     }
+    log_activity(&conn, "user", "note_restored", Some(&id), &format!("Restored note '{}' from trash", id), "{}");
     Ok(())
+}
+
+// --- Note State Machine ---
+
+const VALID_TRANSITIONS: &[(&str, &str)] = &[
+    ("draft", "review"),
+    ("review", "published"),
+    ("review", "draft"),
+    ("published", "review"),
+];
+
+#[tauri::command]
+pub fn set_note_state(
+    db: State<'_, Mutex<Connection>>,
+    id: String,
+    state: String,
+) -> Result<Note, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let existing = fetch_note(&conn, &id)?;
+
+    let valid = VALID_TRANSITIONS
+        .iter()
+        .any(|(from, to)| *from == existing.state && *to == state);
+
+    if !valid {
+        return Err(format!(
+            "Invalid state transition: '{}' → '{}'",
+            existing.state, state
+        ));
+    }
+
+    conn.execute(
+        "UPDATE notes SET state = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![state, Utc::now().to_rfc3339(), id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    log_activity(&conn, "user", "state_changed", Some(&id), &format!("Changed state '{}' → '{}'", existing.state, state), "{}");
+    fetch_note(&conn, &id)
 }
 
 // --- Bear Markdown Import ---

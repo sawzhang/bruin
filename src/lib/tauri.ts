@@ -2,13 +2,16 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   Note,
   NoteListItem,
+  NoteState,
   CreateNoteParams,
   UpdateNoteParams,
   ListNotesParams,
   SearchNotesParams,
 } from "../types/note";
 import type { Tag } from "../types/tag";
+import type { ActivityEvent } from "../types/activity";
 import type { SyncState } from "../types/sync";
+import type { Template } from "../types/template";
 
 // Note commands
 export async function createNote(params: CreateNoteParams): Promise<Note> {
@@ -48,6 +51,14 @@ export async function restoreNote(id: string): Promise<void> {
   return invoke("restore_note", { id });
 }
 
+// State commands
+export async function setNoteState(
+  id: string,
+  state: NoteState,
+): Promise<Note> {
+  return invoke("set_note_state", { id, state });
+}
+
 // Tag commands
 export async function listTags(): Promise<Tag[]> {
   return invoke("list_tags");
@@ -71,6 +82,28 @@ export async function triggerSync(): Promise<void> {
 
 export async function getSyncStatus(): Promise<SyncState> {
   return invoke("get_sync_status");
+}
+
+// Template commands
+export async function listTemplates(): Promise<Template[]> {
+  return invoke("list_templates");
+}
+
+export async function createNoteFromTemplate(
+  templateId: string,
+  title?: string,
+): Promise<Note> {
+  return invoke("create_note_from_template", {
+    params: { template_id: templateId, title },
+  });
+}
+
+// Activity commands
+export async function getActivityFeed(
+  limit?: number,
+  noteId?: string,
+): Promise<ActivityEvent[]> {
+  return invoke("get_activity_feed", { limit: limit ?? 50, noteId });
 }
 
 // Import commands

@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles } from "./db/queries.js";
+import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook } from "./db/queries.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -16,6 +16,86 @@ export function createServer(): McpServer {
     version: "0.1.0",
   });
 
+  // --- Phase 4: MCP Resources ---
+
+  // Helper: notify that a specific note changed
+  function notifyNoteChanged(noteId: string) {
+    try {
+      server.server.sendResourceUpdated({ uri: `bruin://notes/${noteId}` });
+    } catch { /* not connected yet */ }
+  }
+
+  // Helper: notify that the notes list changed (create/delete)
+  function notifyNotesListChanged() {
+    try {
+      server.server.sendResourceUpdated({ uri: "bruin://notes" });
+      server.server.sendResourceUpdated({ uri: "bruin://tags" });
+    } catch { /* not connected yet */ }
+  }
+
+  // Resource: all notes list
+  server.resource(
+    "notes-list",
+    "bruin://notes",
+    { description: "List of all notes in Bruin" },
+    async () => ({
+      contents: [{
+        uri: "bruin://notes",
+        mimeType: "application/json",
+        text: JSON.stringify(listNotes(undefined, 100, 0)),
+      }],
+    })
+  );
+
+  // Resource: individual note (template)
+  server.resource(
+    "note",
+    "bruin://notes/{noteId}",
+    { description: "Read a single note by ID" },
+    async (uri) => {
+      const noteId = uri.pathname.split("/").pop() ?? "";
+      const note = getNote(noteId);
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: note ? JSON.stringify(note) : JSON.stringify({ error: "Not found" }),
+        }],
+      };
+    }
+  );
+
+  // Resource: tags with counts
+  server.resource(
+    "tags",
+    "bruin://tags",
+    { description: "All tags with note counts" },
+    async () => ({
+      contents: [{
+        uri: "bruin://tags",
+        mimeType: "application/json",
+        text: JSON.stringify(listTags()),
+      }],
+    })
+  );
+
+  // Resource: today's daily note
+  server.resource(
+    "daily",
+    "bruin://daily",
+    { description: "Today's daily note" },
+    async () => {
+      const note = getDailyNote();
+      return {
+        contents: [{
+          uri: "bruin://daily",
+          mimeType: "application/json",
+          text: JSON.stringify(note),
+        }],
+      };
+    }
+  );
+
   server.tool(
     "create_note",
     "Create a new note in Bruin",
@@ -26,6 +106,7 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const note = createNote(args.title, args.content, args.tags);
+      notifyNotesListChanged();
       return text({ id: note.id, title: note.title, created_at: note.created_at, tags: note.tags });
     }
   );
@@ -55,6 +136,7 @@ export function createServer(): McpServer {
     async (args) => {
       const note = updateNote(args.id, args.title, args.content, args.tags);
       if (!note) return error(`Note '${args.id}' not found`);
+      notifyNoteChanged(args.id);
       return text(note);
     }
   );
@@ -69,7 +151,40 @@ export function createServer(): McpServer {
     async (args) => {
       const result = deleteNote(args.id, args.permanent ?? false);
       if (!result.success) return error(result.message);
+      notifyNotesListChanged();
       return text(result);
+    }
+  );
+
+  server.tool(
+    "get_activity_feed",
+    "Get the activity feed — a log of all mutations (creates, updates, deletes, state changes). Optionally filter by note.",
+    {
+      limit: z.number().optional().describe("Max events to return (default 50)"),
+      note_id: z.string().optional().describe("Filter by a specific note ID"),
+    },
+    async (args) => {
+      const events = getActivityFeed(args.limit ?? 50, args.note_id);
+      return text(events);
+    }
+  );
+
+  server.tool(
+    "set_note_state",
+    "Transition a note's workflow state. Valid transitions: draft→review, review→published, review→draft, published→review.",
+    {
+      id: z.string().describe("The UUID of the note"),
+      state: z.enum(["draft", "review", "published"]).describe("Target state"),
+    },
+    async (args) => {
+      try {
+        const note = setNoteState(args.id, args.state);
+        if (!note) return error(`Note '${args.id}' not found`);
+        notifyNoteChanged(args.id);
+        return text(note);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
     }
   );
 
@@ -140,6 +255,7 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const notes = batchCreateNotes(args.notes);
+      notifyNotesListChanged();
       return text({ created: notes.length, notes: notes.map((n) => ({ id: n.id, title: n.title, tags: n.tags })) });
     }
   );
@@ -155,6 +271,7 @@ export function createServer(): McpServer {
     async (args) => {
       const note = appendToNote(args.note_id, args.content, args.separator);
       if (!note) return error(`Note '${args.note_id}' not found`);
+      notifyNoteChanged(args.note_id);
       return text(note);
     }
   );
@@ -212,7 +329,73 @@ export function createServer(): McpServer {
     },
     async (args) => {
       const result = importMarkdownFiles(args.paths);
+      notifyNotesListChanged();
       return text(result);
+    }
+  );
+
+  server.tool(
+    "register_webhook",
+    "Register a webhook to receive notifications when events occur. The webhook will receive a POST with JSON body and X-Webhook-Signature header (HMAC-SHA256).",
+    {
+      url: z.string().describe("The URL to send webhook POST requests to"),
+      event_types: z.array(z.string()).optional().describe("Event types to subscribe to (e.g. 'note_created', 'note_updated', 'state_changed'). Empty = all events."),
+      secret: z.string().describe("Secret key for HMAC-SHA256 signature verification"),
+    },
+    async (args) => {
+      const webhook = registerWebhook(args.url, args.event_types ?? [], args.secret);
+      return text(webhook);
+    }
+  );
+
+  server.tool(
+    "list_webhooks",
+    "List all registered webhooks",
+    {},
+    async () => {
+      const webhooks = listWebhooks();
+      return text(webhooks);
+    }
+  );
+
+  server.tool(
+    "delete_webhook",
+    "Delete a webhook by ID",
+    {
+      id: z.string().describe("The UUID of the webhook to delete"),
+    },
+    async (args) => {
+      const result = deleteWebhook(args.id);
+      if (!result.success) return error(result.message);
+      return text(result);
+    }
+  );
+
+  server.tool(
+    "list_templates",
+    "List all available note templates",
+    {},
+    async () => {
+      const templates = listTemplates();
+      return text(templates);
+    }
+  );
+
+  server.tool(
+    "create_from_template",
+    "Create a new note from a template. Variables like {{date}} and {{title}} are expanded automatically.",
+    {
+      template_id: z.string().describe("The UUID of the template to use"),
+      title: z.string().optional().describe("Title for the new note. Defaults to the template name."),
+    },
+    async (args) => {
+      try {
+        const note = createNoteFromTemplate(args.template_id, args.title);
+        notifyNotesListChanged();
+        return text(note);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
     }
   );
 

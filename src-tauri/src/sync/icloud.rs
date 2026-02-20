@@ -101,5 +101,6 @@ pub fn import_file(path: &Path) -> Result<Note, String> {
         file_path: Some(path.to_string_lossy().to_string()),
         sync_hash: None,
         tags,
+        state: "draft".to_string(),
     })
 }

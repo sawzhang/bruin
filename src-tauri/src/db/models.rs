@@ -13,6 +13,7 @@ pub struct Note {
     pub file_path: Option<String>,
     pub sync_hash: Option<String>,
     pub tags: Vec<String>,
+    pub state: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +26,7 @@ pub struct NoteListItem {
     pub is_trashed: bool,
     pub word_count: i64,
     pub tags: Vec<String>,
+    pub state: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,6 +35,41 @@ pub struct Tag {
     pub name: String,
     pub parent_name: Option<String>,
     pub note_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Webhook {
+    pub id: String,
+    pub url: String,
+    pub event_types: Vec<String>,
+    pub secret: String,
+    pub is_active: bool,
+    pub created_at: String,
+    pub last_triggered_at: Option<String>,
+    pub failure_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Template {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub content: String,
+    pub tags: Vec<String>,
+    pub initial_state: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActivityEvent {
+    pub id: i64,
+    pub actor: String,
+    pub event_type: String,
+    pub note_id: Option<String>,
+    pub timestamp: String,
+    pub summary: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

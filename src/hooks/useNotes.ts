@@ -14,6 +14,7 @@ export function useNotes() {
   const pinNote = useNoteStore((s) => s.pinNote);
   const trashNote = useNoteStore((s) => s.trashNote);
   const restoreNote = useNoteStore((s) => s.restoreNote);
+  const setNoteState = useNoteStore((s) => s.setNoteState);
   const setShowTrash = useNoteStore((s) => s.setShowTrash);
 
   return {
@@ -30,6 +31,7 @@ export function useNotes() {
     pinNote,
     trashNote,
     restoreNote,
+    setNoteState,
     setShowTrash,
   };
 }

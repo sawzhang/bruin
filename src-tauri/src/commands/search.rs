@@ -48,6 +48,7 @@ pub fn search_notes(
                 is_trashed: row.get::<_, i32>(5)? != 0,
                 word_count: row.get(6)?,
                 tags: vec![],
+                state: "draft".to_string(),
             })
         })
         .map_err(|e| e.to_string())?;

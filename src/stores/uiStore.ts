@@ -16,11 +16,15 @@ interface UIState {
   noteListWidth: number;
   isCommandPaletteOpen: boolean;
   isThemePickerOpen: boolean;
+  isActivityPanelOpen: boolean;
+  isTemplatePickerOpen: boolean;
   theme: string;
   setSidebarWidth: (w: number) => void;
   setNoteListWidth: (w: number) => void;
   toggleCommandPalette: () => void;
   toggleThemePicker: () => void;
+  toggleActivityPanel: () => void;
+  toggleTemplatePicker: () => void;
   setTheme: (id: string) => void;
 }
 
@@ -29,6 +33,8 @@ export const useUIStore = create<UIState>((set) => ({
   noteListWidth: 280,
   isCommandPaletteOpen: false,
   isThemePickerOpen: false,
+  isActivityPanelOpen: false,
+  isTemplatePickerOpen: false,
   theme: loadSavedTheme(),
 
   setSidebarWidth: (w: number) => set({ sidebarWidth: Math.max(160, Math.min(400, w)) }),
@@ -37,6 +43,10 @@ export const useUIStore = create<UIState>((set) => ({
     set((state) => ({ isCommandPaletteOpen: !state.isCommandPaletteOpen })),
   toggleThemePicker: () =>
     set((state) => ({ isThemePickerOpen: !state.isThemePickerOpen })),
+  toggleActivityPanel: () =>
+    set((state) => ({ isActivityPanelOpen: !state.isActivityPanelOpen })),
+  toggleTemplatePicker: () =>
+    set((state) => ({ isTemplatePickerOpen: !state.isTemplatePickerOpen })),
   setTheme: (id: string) => {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, id);

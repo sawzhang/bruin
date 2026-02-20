@@ -1,3 +1,5 @@
+export type NoteState = "draft" | "review" | "published";
+
 export interface Note {
   id: string;
   title: string;
@@ -10,6 +12,7 @@ export interface Note {
   file_path: string | null;
   sync_hash: string | null;
   tags: string[];
+  state: NoteState;
 }
 
 export interface NoteListItem {
@@ -21,6 +24,7 @@ export interface NoteListItem {
   is_trashed: boolean;
   word_count: number;
   tags: string[];
+  state: NoteState;
 }
 
 export interface CreateNoteParams {

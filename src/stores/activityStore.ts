@@ -1,0 +1,24 @@
+import { create } from "zustand";
+import type { ActivityEvent } from "../types/activity";
+import * as tauri from "../lib/tauri";
+
+interface ActivityState {
+  events: ActivityEvent[];
+  isLoading: boolean;
+  loadEvents: (noteId?: string) => Promise<void>;
+}
+
+export const useActivityStore = create<ActivityState>((set) => ({
+  events: [],
+  isLoading: false,
+
+  loadEvents: async (noteId?: string) => {
+    set({ isLoading: true });
+    try {
+      const events = await tauri.getActivityFeed(50, noteId);
+      set({ events, isLoading: false });
+    } catch {
+      set({ isLoading: false });
+    }
+  },
+}));

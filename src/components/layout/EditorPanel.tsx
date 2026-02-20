@@ -4,9 +4,28 @@ import { useNotes } from "../../hooks/useNotes";
 import { useTags } from "../../hooks/useTags";
 import { MarkdownEditor } from "../editor/MarkdownEditor";
 import { EmptyState } from "../common/EmptyState";
+import type { NoteState } from "../../types/note";
+
+const STATE_COLORS: Record<NoteState, string> = {
+  draft: "bg-gray-400",
+  review: "bg-yellow-500",
+  published: "bg-green-500",
+};
+
+const STATE_LABELS: Record<NoteState, string> = {
+  draft: "Draft",
+  review: "In Review",
+  published: "Published",
+};
+
+const STATE_TRANSITIONS: Record<NoteState, NoteState[]> = {
+  draft: ["review"],
+  review: ["published", "draft"],
+  published: ["review"],
+};
 
 export function EditorPanel() {
-  const { currentNote, updateNote, selectNote, createNote, notes } =
+  const { currentNote, updateNote, selectNote, createNote, notes, setNoteState } =
     useNotes();
   const { selectTag, loadTags } = useTags();
 
@@ -99,6 +118,22 @@ export function EditorPanel() {
           placeholder="Note title"
           className="w-full bg-transparent text-[24px] font-bold text-bear-text placeholder:text-bear-text-muted outline-none border-none"
         />
+      </div>
+
+      {/* State badge + transition buttons */}
+      <div className="px-8 pb-2 flex items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full text-white ${STATE_COLORS[currentNote.state]}`}>
+          {STATE_LABELS[currentNote.state]}
+        </span>
+        {STATE_TRANSITIONS[currentNote.state].map((target) => (
+          <button
+            key={target}
+            onClick={() => setNoteState(currentNote.id, target)}
+            className="text-[11px] px-2 py-0.5 rounded border border-bear-border text-bear-text-secondary hover:bg-bear-hover transition-colors"
+          >
+            → {STATE_LABELS[target]}
+          </button>
+        ))}
       </div>
 
       {/* Tags */}

@@ -84,6 +84,124 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
         ",
     )?;
 
+    // Performance: indices for common query patterns
+    conn.execute_batch(
+        "
+        CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_notes_trashed ON notes(is_trashed);
+        CREATE INDEX IF NOT EXISTS idx_notes_pinned_updated ON notes(is_pinned DESC, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_notes_state ON notes(state);
+        ",
+    )?;
+
+    // Phase 1: Add state column to notes
+    let has_state_col: bool = conn
+        .prepare("SELECT COUNT(*) FROM pragma_table_info('notes') WHERE name='state'")?
+        .query_row([], |row| row.get::<_, i64>(0))
+        .unwrap_or(0)
+        > 0;
+    if !has_state_col {
+        conn.execute_batch("ALTER TABLE notes ADD COLUMN state TEXT NOT NULL DEFAULT 'draft';")?;
+    }
+
+    // Phase 2: Activity Feed
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS activity_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor TEXT NOT NULL DEFAULT 'user',
+            event_type TEXT NOT NULL,
+            note_id TEXT,
+            timestamp TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            data TEXT NOT NULL DEFAULT '{}'
+        );
+        CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_events(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_activity_note_id ON activity_events(note_id);
+        ",
+    )?;
+
+    // Phase 3: Templates
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS templates (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL DEFAULT '',
+            content TEXT NOT NULL DEFAULT '',
+            tags TEXT NOT NULL DEFAULT '[]',
+            initial_state TEXT NOT NULL DEFAULT 'draft',
+            created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
+            updated_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z'
+        );
+        ",
+    )?;
+
+    // Phase 5: Webhooks
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS webhooks (
+            id TEXT PRIMARY KEY,
+            url TEXT NOT NULL,
+            event_types TEXT NOT NULL DEFAULT '[]',
+            secret TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            last_triggered_at TEXT,
+            failure_count INTEGER NOT NULL DEFAULT 0
+        );
+        ",
+    )?;
+
+    // Seed default templates if table is empty
+    let template_count: i64 = conn
+        .prepare("SELECT COUNT(*) FROM templates")?
+        .query_row([], |row| row.get(0))
+        .unwrap_or(0);
+
+    if template_count == 0 {
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO templates (id, name, description, content, tags, initial_state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![
+                uuid::Uuid::new_v4().to_string(),
+                "Daily Journal",
+                "A daily journal entry with sections for gratitude, tasks, and reflections.",
+                "# {{date}}\n\n## Gratitude\n\n- \n\n## Tasks\n\n- [ ] \n\n## Reflections\n\n",
+                "[\"daily\",\"journal\"]",
+                "draft",
+                now,
+                now,
+            ],
+        )?;
+        conn.execute(
+            "INSERT INTO templates (id, name, description, content, tags, initial_state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![
+                uuid::Uuid::new_v4().to_string(),
+                "Meeting Notes",
+                "Template for capturing meeting notes with attendees, agenda, and action items.",
+                "# {{title}}\n\n**Date:** {{date}}\n**Attendees:**\n\n## Agenda\n\n1. \n\n## Notes\n\n\n\n## Action Items\n\n- [ ] \n",
+                "[\"meeting\",\"notes\"]",
+                "draft",
+                now,
+                now,
+            ],
+        )?;
+        conn.execute(
+            "INSERT INTO templates (id, name, description, content, tags, initial_state, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![
+                uuid::Uuid::new_v4().to_string(),
+                "Research Summary",
+                "Template for summarizing research findings with sources and key takeaways.",
+                "# {{title}}\n\n## Topic\n\n\n\n## Key Findings\n\n1. \n\n## Sources\n\n- \n\n## Takeaways\n\n",
+                "[\"research\"]",
+                "review",
+                now,
+                now,
+            ],
+        )?;
+    }
+
     app_handle.manage(Mutex::new(conn));
 
     Ok(())

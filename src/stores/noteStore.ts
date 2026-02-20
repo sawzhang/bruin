@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type {
   Note,
   NoteListItem,
+  NoteState,
   ListNotesParams,
   UpdateNoteParams,
 } from "../types/note";
@@ -22,6 +23,7 @@ interface NoteState {
   pinNote: (id: string) => Promise<void>;
   trashNote: (id: string) => Promise<void>;
   restoreNote: (id: string) => Promise<void>;
+  setNoteState: (id: string, state: NoteState) => Promise<void>;
   setShowTrash: (show: boolean) => void;
 }
 
@@ -142,6 +144,19 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       await tauri.restoreNote(id);
       await get().loadNotes();
+    } catch {
+      // ignore
+    }
+  },
+
+  setNoteState: async (id: string, state: NoteState) => {
+    try {
+      const note = await tauri.setNoteState(id, state);
+      set({ currentNote: note });
+      const notes = get().notes.map((n) =>
+        n.id === note.id ? { ...n, state: note.state } : n,
+      );
+      set({ notes });
     } catch {
       // ignore
     }
