@@ -436,34 +436,35 @@ export function advancedQuery(
   filters: AdvancedQueryFilters
 ): Array<{ id: string; title: string; preview: string; updated_at: string; word_count: number; is_pinned: number; tags: string[] }> {
   const conditions: string[] = ["n.is_trashed = 0"];
-  const params: unknown[] = [];
+  const whereParams: unknown[] = [];
+  const joinParams: unknown[] = [];
   const joins: string[] = [];
   const limit = filters.limit ?? 50;
   const offset = filters.offset ?? 0;
 
   if (filters.date_from) {
     conditions.push("n.updated_at >= ?");
-    params.push(filters.date_from);
+    whereParams.push(filters.date_from);
   }
 
   if (filters.date_to) {
     conditions.push("n.updated_at <= ?");
-    params.push(filters.date_to);
+    whereParams.push(filters.date_to);
   }
 
   if (filters.is_pinned !== undefined) {
     conditions.push("n.is_pinned = ?");
-    params.push(filters.is_pinned ? 1 : 0);
+    whereParams.push(filters.is_pinned ? 1 : 0);
   }
 
   if (filters.min_word_count !== undefined) {
     conditions.push("n.word_count >= ?");
-    params.push(filters.min_word_count);
+    whereParams.push(filters.min_word_count);
   }
 
   if (filters.max_word_count !== undefined) {
     conditions.push("n.word_count <= ?");
-    params.push(filters.max_word_count);
+    whereParams.push(filters.max_word_count);
   }
 
   if (filters.tags && filters.tags.length > 0) {
@@ -475,15 +476,14 @@ export function advancedQuery(
         `JOIN note_tags nt_filter ON nt_filter.note_id = n.id
          JOIN tags t_filter ON t_filter.id = nt_filter.tag_id AND t_filter.name IN (${placeholders})`
       );
-      params.push(...filters.tags);
+      joinParams.push(...filters.tags);
       conditions.push("1=1");
-      // Group by to ensure all tags match
     } else {
       joins.push(
         `JOIN note_tags nt_filter ON nt_filter.note_id = n.id
          JOIN tags t_filter ON t_filter.id = nt_filter.tag_id AND t_filter.name IN (${placeholders})`
       );
-      params.push(...filters.tags);
+      joinParams.push(...filters.tags);
     }
   }
 
@@ -491,7 +491,7 @@ export function advancedQuery(
   if (filters.search_text) {
     ftsJoin = "JOIN notes_fts fts ON fts.rowid = n.rowid";
     conditions.push("notes_fts MATCH ?");
-    params.push(filters.search_text);
+    whereParams.push(filters.search_text);
   }
 
   const whereClause = conditions.join(" AND ");
@@ -499,10 +499,11 @@ export function advancedQuery(
 
   let groupByClause = "GROUP BY n.id";
   let havingClause = "";
+  const havingParams: unknown[] = [];
 
   if (filters.tags && filters.tags.length > 0 && (filters.tag_mode ?? "or") === "and") {
     havingClause = `HAVING COUNT(DISTINCT t_filter.name) = ?`;
-    params.push(filters.tags.length);
+    havingParams.push(filters.tags.length);
   }
 
   const sql = `
@@ -517,7 +518,8 @@ export function advancedQuery(
     LIMIT ? OFFSET ?
   `;
 
-  params.push(limit, offset);
+  // Params must match SQL positional order: JOIN → WHERE → HAVING → LIMIT/OFFSET
+  const params = [...joinParams, ...whereParams, ...havingParams, limit, offset];
 
   const rows = db.prepare(sql).all(...params) as NoteRow[];
 
