@@ -131,15 +131,23 @@ pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
 
                 match action {
                     SyncAction::Import => {
-                        import_note_to_db(conn, &file_note)?;
-                        files_synced += 1;
+                        match import_note_to_db(conn, &file_note) {
+                            Ok(()) => files_synced += 1,
+                            Err(e) => log::warn!("Failed to import note {} from iCloud: {}", file_note.id, e),
+                        }
                     }
                     SyncAction::Export => {
                         if let Some(db) = &db_note {
-                            icloud::export_note(db)?;
-                            let hash = icloud::compute_sync_hash(&db.title, &db.content);
-                            update_sync_hash(conn, &db.id, &hash)?;
-                            files_synced += 1;
+                            match icloud::export_note(db) {
+                                Ok(()) => {
+                                    let hash = icloud::compute_sync_hash(&db.title, &db.content);
+                                    if let Err(e) = update_sync_hash(conn, &db.id, &hash) {
+                                        log::warn!("Failed to update sync hash for note {}: {}", db.id, e);
+                                    }
+                                    files_synced += 1;
+                                }
+                                Err(e) => log::warn!("Failed to export note {} to iCloud: {}", db.id, e),
+                            }
                         }
                     }
                     SyncAction::Skip => {}
@@ -159,10 +167,19 @@ pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
     let all_db_notes = fetch_all_notes(conn)?;
     for note in &all_db_notes {
         if !synced_ids.contains(&note.id) {
-            icloud::export_note(note)?;
-            let hash = icloud::compute_sync_hash(&note.title, &note.content);
-            update_sync_hash(conn, &note.id, &hash)?;
-            files_synced += 1;
+            match icloud::export_note(note) {
+                Ok(()) => {
+                    let hash = icloud::compute_sync_hash(&note.title, &note.content);
+                    if let Err(e) = update_sync_hash(conn, &note.id, &hash) {
+                        log::warn!("Failed to update sync hash for note {}: {}", note.id, e);
+                    }
+                    files_synced += 1;
+                }
+                Err(e) => {
+                    log::warn!("Failed to export note {} to iCloud: {}", note.id, e);
+                    // Continue syncing other notes instead of aborting
+                }
+            }
         }
     }
 

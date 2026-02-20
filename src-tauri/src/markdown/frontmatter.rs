@@ -50,15 +50,25 @@ pub fn parse_frontmatter(content: &str) -> Result<(FrontmatterData, String), Str
     }
 
     let rest = &content[3..];
-    let end = rest
-        .find("\n---\n")
-        .or_else(|| rest.find("\n---"))
-        .ok_or_else(|| "Invalid frontmatter: no closing ---".to_string())?;
+
+    // Find closing --- delimiter. Try \n---\n first (has body after), then \n--- at end.
+    let (end, body_offset) = if let Some(pos) = rest.find("\n---\n") {
+        (pos, pos + 5) // skip \n---\n
+    } else if let Some(pos) = rest.find("\n---") {
+        // Check it's actually at the end or followed by EOF
+        let after = pos + 4;
+        if after >= rest.len() || rest[after..].trim().is_empty() {
+            (pos, rest.len()) // no body
+        } else {
+            (pos, after)
+        }
+    } else {
+        return Err("Invalid frontmatter: no closing ---".to_string());
+    };
 
     let yaml_str = &rest[..end];
-    let body_start = end + 4; // skip \n---\n
-    let body = if body_start < rest.len() {
-        rest[body_start..].to_string()
+    let body = if body_offset < rest.len() {
+        rest[body_offset..].to_string()
     } else {
         String::new()
     };

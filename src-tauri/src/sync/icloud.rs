@@ -5,19 +5,20 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// Return the iCloud notes directory path.
-pub fn get_icloud_dir() -> PathBuf {
-    let home = std::env::var("HOME").expect("HOME not set");
-    PathBuf::from(home)
+pub fn get_icloud_dir() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME")
+        .map_err(|_| "HOME environment variable not set".to_string())?;
+    Ok(PathBuf::from(home)
         .join("Library")
         .join("Mobile Documents")
         .join("com~apple~CloudDocs")
         .join("Bruin")
-        .join("notes")
+        .join("notes"))
 }
 
 /// Write note as .md file to iCloud directory using frontmatter serialization.
 pub fn export_note(note: &Note) -> Result<(), String> {
-    let dir = get_icloud_dir();
+    let dir = get_icloud_dir()?;
     fs::create_dir_all(&dir).map_err(|e| format!("Failed to create iCloud directory: {}", e))?;
 
     let file_path = dir.join(format!("{}.md", note.id));
@@ -38,7 +39,7 @@ pub fn compute_sync_hash(title: &str, content: &str) -> String {
 
 /// Delete a note's .md file from the iCloud directory.
 pub fn delete_note_file(id: &str) -> Result<(), String> {
-    let file_path = get_icloud_dir().join(format!("{}.md", id));
+    let file_path = get_icloud_dir()?.join(format!("{}.md", id));
     if file_path.exists() {
         fs::remove_file(&file_path)
             .map_err(|e| format!("Failed to delete note file: {}", e))?;
@@ -48,7 +49,7 @@ pub fn delete_note_file(id: &str) -> Result<(), String> {
 
 /// List all .md files in the iCloud directory.
 pub fn list_icloud_files() -> Result<Vec<PathBuf>, String> {
-    let dir = get_icloud_dir();
+    let dir = get_icloud_dir()?;
     if !dir.exists() {
         return Ok(vec![]);
     }

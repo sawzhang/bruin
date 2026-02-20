@@ -11,7 +11,8 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager};
 
 pub fn start_watcher(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let icloud_dir = icloud::get_icloud_dir();
+    let icloud_dir = icloud::get_icloud_dir()
+        .map_err(|e| format!("Cannot start iCloud watcher: {}", e))?;
     fs::create_dir_all(&icloud_dir)?;
 
     let (tx, rx) = mpsc::channel::<PathBuf>();
@@ -65,9 +66,14 @@ pub fn start_watcher(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::E
                     }
 
                     let db = app.state::<Mutex<Connection>>();
-                    if let Ok(conn) = db.lock() {
-                        for path in &ready {
-                            process_file_change(&conn, path);
+                    match db.lock() {
+                        Ok(conn) => {
+                            for path in &ready {
+                                process_file_change(&conn, path);
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to acquire DB lock for sync: {}. {} file events dropped.", e, ready.len());
                         }
                     }
 
@@ -83,6 +89,7 @@ pub fn start_watcher(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::E
 
 fn process_file_change(conn: &Connection, path: &PathBuf) {
     if !path.exists() {
+        log::debug!("Skipping deleted file: {:?}", path);
         return;
     }
 
@@ -102,7 +109,9 @@ fn process_file_change(conn: &Connection, path: &PathBuf) {
                 }
                 SyncAction::Export => {
                     if let Some(ref db) = db_note {
-                        let _ = icloud::export_note(db);
+                        if let Err(e) = icloud::export_note(db) {
+                            log::warn!("Failed to export note {} back to iCloud: {}", db.id, e);
+                        }
                     }
                 }
                 _ => {}
