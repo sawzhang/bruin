@@ -1,0 +1,52 @@
+{
+  "name": "bruin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-sql": "^2",
+    "@tauri-apps/plugin-fs": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-shell": "^2",
+    "@tiptap/react": "^2.11",
+    "@tiptap/starter-kit": "^2.11",
+    "@tiptap/pm": "^2.11",
+    "@tiptap/extension-code-block-lowlight": "^2.11",
+    "@tiptap/extension-task-list": "^2.11",
+    "@tiptap/extension-task-item": "^2.11",
+    "@tiptap/extension-image": "^2.11",
+    "@tiptap/extension-typography": "^2.11",
+    "@tiptap/extension-placeholder": "^2.11",
+    "@tiptap/extension-bubble-menu": "^2.11",
+    "@tiptap/extension-link": "^2.11",
+    "@tiptap/suggestion": "^2.11",
+    "tiptap-markdown": "^0.8",
+    "lowlight": "^3",
+    "zustand": "^5",
+    "cmdk": "^1",
+    "react": "^19",
+    "react-dom": "^19",
+    "clsx": "^2",
+    "date-fns": "^4",
+    "uuid": "^11"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/uuid": "^10",
+    "@vitejs/plugin-react": "^4",
+    "autoprefixer": "^10",
+    "postcss": "^8",
+    "tailwindcss": "^3",
+    "typescript": "^5.7",
+    "vite": "^6"
+  }
+}

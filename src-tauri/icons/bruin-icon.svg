@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#D4853A"/>
+      <stop offset="100%" stop-color="#B8602A"/>
+    </linearGradient>
+    <linearGradient id="bearShade" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#F0E8E0" stop-opacity="0.90"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="115%" height="115%">
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded rectangle background -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+
+  <!-- Bear head silhouette - side profile facing right -->
+  <g transform="translate(256, 260)" filter="url(#shadow)">
+    <!-- Left ear -->
+    <ellipse cx="-82" cy="-130" rx="42" ry="48" fill="url(#bearShade)" transform="rotate(-15, -82, -130)"/>
+    <!-- Right ear -->
+    <ellipse cx="30" cy="-145" rx="38" ry="44" fill="url(#bearShade)" transform="rotate(10, 30, -145)"/>
+
+    <!-- Main head shape -->
+    <path d="
+      M -110,-80
+      C -120,-45 -115,5 -100,35
+      C -85,65 -55,95 -20,115
+      C 5,130 35,135 60,128
+      C 85,120 108,100 120,75
+      C 132,50 138,18 135,-15
+      C 132,-48 118,-82 95,-105
+      C 72,-128 42,-140 10,-145
+      C -22,-150 -58,-140 -82,-125
+      C -100,-112 -108,-98 -110,-80
+      Z
+    " fill="url(#bearShade)"/>
+
+    <!-- Snout / muzzle - protruding forward -->
+    <path d="
+      M 80,45
+      C 100,35 128,28 148,32
+      C 162,35 170,48 168,62
+      C 165,78 150,90 130,92
+      C 110,94 88,85 75,72
+      C 68,64 68,52 80,45
+      Z
+    " fill="url(#bearShade)"/>
+
+    <!-- Nose -->
+    <ellipse cx="158" cy="50" rx="14" ry="11" fill="#6B4226" opacity="0.7"/>
+
+    <!-- Eye -->
+    <circle cx="55" cy="-25" r="10" fill="#6B4226" opacity="0.6"/>
+
+    <!-- Inner ear shadow (left) -->
+    <ellipse cx="-80" cy="-125" rx="22" ry="26" fill="#D4853A" opacity="0.25" transform="rotate(-15, -80, -125)"/>
+    <!-- Inner ear shadow (right) -->
+    <ellipse cx="32" cy="-140" rx="20" ry="24" fill="#D4853A" opacity="0.25" transform="rotate(10, 32, -140)"/>
+
+    <!-- Small pen/pencil detail behind the ear - representing writing -->
+    <g transform="rotate(-35, -45, -160)">
+      <rect x="-52" y="-200" width="6" height="52" rx="2" fill="#FFFFFF" opacity="0.5"/>
+      <polygon points="-52,-148 -46,-148 -49,-138" fill="#FFFFFF" opacity="0.5"/>
+    </g>
+  </g>
+</svg>

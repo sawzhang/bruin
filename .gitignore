@@ -1,0 +1,7 @@
+node_modules/
+dist/
+src-tauri/target/
+mcp-server/dist/
+mcp-server/node_modules/
+*.log
+.DS_Store
