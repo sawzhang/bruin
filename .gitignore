@@ -5,3 +5,7 @@ mcp-server/dist/
 mcp-server/node_modules/
 *.log
 .DS_Store
+tsconfig.tsbuildinfo
+tsconfig.node.tsbuildinfo
+vite.config.js
+vite.config.d.ts
