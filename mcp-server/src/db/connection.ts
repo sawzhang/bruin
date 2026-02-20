@@ -65,6 +65,13 @@ function ensureDatabase(): Database.Database {
       INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', OLD.rowid, OLD.title, OLD.content);
       INSERT INTO notes_fts(rowid, title, content) VALUES (NEW.rowid, NEW.title, NEW.content);
     END;
+
+    CREATE TABLE IF NOT EXISTS note_metadata (
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY (note_id, key)
+    );
   `);
 
   return db;

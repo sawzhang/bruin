@@ -1,4 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
+import fs from "node:fs";
+import path from "node:path";
 import db from "./connection.js";
 
 const TAG_REGEX = /#([a-zA-Z0-9_]+(?:\/[a-zA-Z0-9_]+)*)/g;
@@ -299,4 +301,233 @@ export function listTags(): Array<{ name: string; note_count: number }> {
     .prepare("SELECT name, note_count FROM tags WHERE note_count > 0 ORDER BY name")
     .all() as Array<{ name: string; note_count: number }>;
   return rows;
+}
+
+export function batchCreateNotes(
+  notes: Array<{ title: string; content: string; tags?: string[] }>
+): NoteWithTags[] {
+  const results: NoteWithTags[] = [];
+  const transaction = db.transaction(() => {
+    for (const note of notes) {
+      results.push(createNote(note.title, note.content, note.tags));
+    }
+  });
+  transaction();
+  return results;
+}
+
+export function appendToNote(
+  noteId: string,
+  content: string,
+  separator = "\n\n"
+): NoteWithTags | null {
+  const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(noteId) as
+    | NoteRow
+    | undefined;
+
+  if (!existing) return null;
+
+  const newContent = existing.content + separator + content;
+  const wc = wordCount(newContent);
+  const timestamp = now();
+
+  db.prepare(
+    `UPDATE notes SET content = ?, updated_at = ?, word_count = ? WHERE id = ?`
+  ).run(newContent, timestamp, wc, noteId);
+
+  syncNoteTags(noteId, extractTags(newContent));
+
+  return getNote(noteId);
+}
+
+export function getBacklinks(
+  noteTitle: string
+): Array<{ id: string; title: string; preview: string; updated_at: string; tags: string[] }> {
+  const pattern = `%[[${noteTitle}]]%`;
+  const rows = db
+    .prepare(
+      `SELECT * FROM notes WHERE content LIKE ? AND is_trashed = 0`
+    )
+    .all(pattern) as NoteRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    preview: row.content.slice(0, 200),
+    updated_at: row.updated_at,
+    tags: getTagsForNote(row.id),
+  }));
+}
+
+export function getDailyNote(date?: string): NoteWithTags {
+  const targetDate = date ?? new Date().toISOString().split("T")[0];
+  const title = targetDate;
+
+  const existing = db
+    .prepare("SELECT * FROM notes WHERE title = ? AND is_trashed = 0")
+    .all(title) as NoteRow[];
+
+  if (existing.length > 0) {
+    return { ...existing[0], tags: getTagsForNote(existing[0].id) };
+  }
+
+  const content = `# ${targetDate}\n\n`;
+  return createNote(title, content, ["daily"]);
+}
+
+export function importMarkdownFiles(
+  paths: string[]
+): { imported: number; skipped: number } {
+  let imported = 0;
+  let skipped = 0;
+
+  const transaction = db.transaction(() => {
+    for (const filePath of paths) {
+      try {
+        const stat = fs.statSync(filePath);
+        const mdFiles: string[] = [];
+
+        if (stat.isDirectory()) {
+          const entries = fs.readdirSync(filePath);
+          for (const entry of entries) {
+            if (entry.endsWith(".md")) {
+              mdFiles.push(path.join(filePath, entry));
+            }
+          }
+        } else if (filePath.endsWith(".md")) {
+          mdFiles.push(filePath);
+        }
+
+        for (const mdFile of mdFiles) {
+          try {
+            const content = fs.readFileSync(mdFile, "utf-8");
+            const title = path.basename(mdFile, ".md");
+            const tags = extractTags(content);
+            createNote(title, content, tags);
+            imported++;
+          } catch {
+            skipped++;
+          }
+        }
+      } catch {
+        skipped++;
+      }
+    }
+  });
+
+  transaction();
+  return { imported, skipped };
+}
+
+export interface AdvancedQueryFilters {
+  date_from?: string;
+  date_to?: string;
+  tags?: string[];
+  tag_mode?: "and" | "or";
+  is_pinned?: boolean;
+  min_word_count?: number;
+  max_word_count?: number;
+  search_text?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function advancedQuery(
+  filters: AdvancedQueryFilters
+): Array<{ id: string; title: string; preview: string; updated_at: string; word_count: number; is_pinned: number; tags: string[] }> {
+  const conditions: string[] = ["n.is_trashed = 0"];
+  const params: unknown[] = [];
+  const joins: string[] = [];
+  const limit = filters.limit ?? 50;
+  const offset = filters.offset ?? 0;
+
+  if (filters.date_from) {
+    conditions.push("n.updated_at >= ?");
+    params.push(filters.date_from);
+  }
+
+  if (filters.date_to) {
+    conditions.push("n.updated_at <= ?");
+    params.push(filters.date_to);
+  }
+
+  if (filters.is_pinned !== undefined) {
+    conditions.push("n.is_pinned = ?");
+    params.push(filters.is_pinned ? 1 : 0);
+  }
+
+  if (filters.min_word_count !== undefined) {
+    conditions.push("n.word_count >= ?");
+    params.push(filters.min_word_count);
+  }
+
+  if (filters.max_word_count !== undefined) {
+    conditions.push("n.word_count <= ?");
+    params.push(filters.max_word_count);
+  }
+
+  if (filters.tags && filters.tags.length > 0) {
+    const mode = filters.tag_mode ?? "or";
+    const placeholders = filters.tags.map(() => "?").join(", ");
+
+    if (mode === "and") {
+      joins.push(
+        `JOIN note_tags nt_filter ON nt_filter.note_id = n.id
+         JOIN tags t_filter ON t_filter.id = nt_filter.tag_id AND t_filter.name IN (${placeholders})`
+      );
+      params.push(...filters.tags);
+      conditions.push("1=1");
+      // Group by to ensure all tags match
+    } else {
+      joins.push(
+        `JOIN note_tags nt_filter ON nt_filter.note_id = n.id
+         JOIN tags t_filter ON t_filter.id = nt_filter.tag_id AND t_filter.name IN (${placeholders})`
+      );
+      params.push(...filters.tags);
+    }
+  }
+
+  let ftsJoin = "";
+  if (filters.search_text) {
+    ftsJoin = "JOIN notes_fts fts ON fts.rowid = n.rowid";
+    conditions.push("notes_fts MATCH ?");
+    params.push(filters.search_text);
+  }
+
+  const whereClause = conditions.join(" AND ");
+  const joinClause = joins.join("\n");
+
+  let groupByClause = "GROUP BY n.id";
+  let havingClause = "";
+
+  if (filters.tags && filters.tags.length > 0 && (filters.tag_mode ?? "or") === "and") {
+    havingClause = `HAVING COUNT(DISTINCT t_filter.name) = ?`;
+    params.push(filters.tags.length);
+  }
+
+  const sql = `
+    SELECT n.*
+    FROM notes n
+    ${joinClause}
+    ${ftsJoin}
+    WHERE ${whereClause}
+    ${groupByClause}
+    ${havingClause}
+    ORDER BY n.updated_at DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  params.push(limit, offset);
+
+  const rows = db.prepare(sql).all(...params) as NoteRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    preview: row.content.slice(0, 200),
+    updated_at: row.updated_at,
+    word_count: row.word_count,
+    is_pinned: row.is_pinned,
+    tags: getTagsForNote(row.id),
+  }));
 }
