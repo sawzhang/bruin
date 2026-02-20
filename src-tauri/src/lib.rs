@@ -3,7 +3,10 @@ mod db;
 mod markdown;
 mod sync;
 
+use commands::sync::SyncState;
 use db::migrations;
+use std::sync::Mutex;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -12,9 +15,20 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .manage(Mutex::new(SyncState::default()))
         .setup(|app| {
             let app_handle = app.handle().clone();
             migrations::run_migrations(&app_handle)?;
+
+            // Run initial full reconciliation
+            {
+                let db = app_handle.state::<Mutex<rusqlite::Connection>>();
+                let conn = db.lock().map_err(|e: std::sync::PoisonError<_>| e.to_string())?;
+                if let Err(e) = sync::reconciler::full_reconcile(&conn) {
+                    log::warn!("Initial sync failed: {}", e);
+                }
+            }
+
             sync::watcher::start_watcher(&app_handle)?;
             Ok(())
         })
@@ -27,6 +41,7 @@ pub fn run() {
             commands::notes::pin_note,
             commands::notes::trash_note,
             commands::notes::restore_note,
+            commands::notes::import_markdown_files,
             commands::tags::list_tags,
             commands::tags::get_notes_by_tag,
             commands::search::search_notes,

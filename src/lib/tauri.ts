@@ -72,3 +72,10 @@ export async function triggerSync(): Promise<void> {
 export async function getSyncStatus(): Promise<SyncState> {
   return invoke("get_sync_status");
 }
+
+// Import commands
+export async function importMarkdownFiles(
+  paths: string[],
+): Promise<{ imported: number; skipped: number }> {
+  return invoke("import_markdown_files", { paths });
+}

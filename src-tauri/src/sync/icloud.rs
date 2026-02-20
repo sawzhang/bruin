@@ -1,5 +1,6 @@
 use crate::db::models::Note;
 use crate::markdown::frontmatter;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -25,6 +26,47 @@ pub fn export_note(note: &Note) -> Result<(), String> {
         .map_err(|e| format!("Failed to write note to iCloud: {}", e))?;
 
     Ok(())
+}
+
+/// Compute SHA-256 hash of title + content for sync comparison.
+pub fn compute_sync_hash(title: &str, content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(title.as_bytes());
+    hasher.update(content.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// Delete a note's .md file from the iCloud directory.
+pub fn delete_note_file(id: &str) -> Result<(), String> {
+    let file_path = get_icloud_dir().join(format!("{}.md", id));
+    if file_path.exists() {
+        fs::remove_file(&file_path)
+            .map_err(|e| format!("Failed to delete note file: {}", e))?;
+    }
+    Ok(())
+}
+
+/// List all .md files in the iCloud directory.
+pub fn list_icloud_files() -> Result<Vec<PathBuf>, String> {
+    let dir = get_icloud_dir();
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let entries =
+        fs::read_dir(&dir).map_err(|e| format!("Failed to read iCloud directory: {}", e))?;
+
+    let mut files = Vec::new();
+    for entry in entries {
+        let entry =
+            entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            files.push(path);
+        }
+    }
+
+    Ok(files)
 }
 
 /// Read .md file, parse frontmatter, return Note data.

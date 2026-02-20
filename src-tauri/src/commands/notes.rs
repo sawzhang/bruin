@@ -1,8 +1,12 @@
 use crate::db::models::*;
 use crate::markdown::tags::extract_tags;
 use crate::markdown::tags::get_parent_tag;
+use crate::sync::icloud;
 use chrono::Utc;
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::State;
 use uuid::Uuid;
@@ -11,7 +15,7 @@ fn compute_word_count(content: &str) -> i64 {
     content.split_whitespace().count() as i64
 }
 
-fn sync_tags(conn: &Connection, note_id: &str, tags: &[String]) -> Result<(), String> {
+pub(crate) fn sync_tags(conn: &Connection, note_id: &str, tags: &[String]) -> Result<(), String> {
     conn.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])
         .map_err(|e| e.to_string())?;
 
@@ -45,7 +49,7 @@ fn sync_tags(conn: &Connection, note_id: &str, tags: &[String]) -> Result<(), St
     Ok(())
 }
 
-fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<String>, String> {
+pub(crate) fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<String>, String> {
     let mut stmt = conn
         .prepare("SELECT t.name FROM tags t JOIN note_tags nt ON t.id = nt.tag_id WHERE nt.note_id = ?1 ORDER BY t.name")
         .map_err(|e| e.to_string())?;
@@ -59,7 +63,7 @@ fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<String>, Stri
     Ok(tags)
 }
 
-fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
+pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
     let note = conn
         .query_row(
             "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash FROM notes WHERE id = ?1",
@@ -86,6 +90,16 @@ fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
     Ok(Note { tags, ..note })
 }
 
+/// Compute sync hash and update in DB, then export to iCloud.
+fn sync_to_icloud(conn: &Connection, note: &Note) {
+    let hash = icloud::compute_sync_hash(&note.title, &note.content);
+    let _ = conn.execute(
+        "UPDATE notes SET sync_hash = ?1 WHERE id = ?2",
+        rusqlite::params![hash, note.id],
+    );
+    let _ = icloud::export_note(note);
+}
+
 #[tauri::command]
 pub fn create_note(
     db: State<'_, Mutex<Connection>>,
@@ -106,7 +120,9 @@ pub fn create_note(
     .map_err(|e| e.to_string())?;
 
     sync_tags(&conn, &id, &tags)?;
-    fetch_note(&conn, &id)
+    let note = fetch_note(&conn, &id)?;
+    sync_to_icloud(&conn, &note);
+    Ok(note)
 }
 
 #[tauri::command]
@@ -136,7 +152,9 @@ pub fn update_note(
     .map_err(|e| e.to_string())?;
 
     sync_tags(&conn, &params.id, &tags)?;
-    fetch_note(&conn, &params.id)
+    let note = fetch_note(&conn, &params.id)?;
+    sync_to_icloud(&conn, &note);
+    Ok(note)
 }
 
 #[tauri::command]
@@ -156,6 +174,7 @@ pub fn delete_note(
             "UPDATE tags SET note_count = (SELECT COUNT(*) FROM note_tags WHERE note_tags.tag_id = tags.id)",
         )
         .map_err(|e| e.to_string())?;
+        let _ = icloud::delete_note_file(&id);
     } else {
         conn.execute(
             "UPDATE notes SET is_trashed = 1, updated_at = ?1 WHERE id = ?2",
@@ -273,6 +292,10 @@ pub fn pin_note(
         rusqlite::params![pinned_int, Utc::now().to_rfc3339(), id],
     )
     .map_err(|e| e.to_string())?;
+
+    if let Ok(note) = fetch_note(&conn, &id) {
+        let _ = icloud::export_note(&note);
+    }
     Ok(())
 }
 
@@ -284,6 +307,8 @@ pub fn trash_note(db: State<'_, Mutex<Connection>>, id: String) -> Result<(), St
         rusqlite::params![Utc::now().to_rfc3339(), id],
     )
     .map_err(|e| e.to_string())?;
+
+    let _ = icloud::delete_note_file(&id);
     Ok(())
 }
 
@@ -295,5 +320,91 @@ pub fn restore_note(db: State<'_, Mutex<Connection>>, id: String) -> Result<(), 
         rusqlite::params![Utc::now().to_rfc3339(), id],
     )
     .map_err(|e| e.to_string())?;
+
+    if let Ok(note) = fetch_note(&conn, &id) {
+        sync_to_icloud(&conn, &note);
+    }
     Ok(())
+}
+
+// --- Bear Markdown Import ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImportResult {
+    pub imported: u32,
+    pub skipped: u32,
+}
+
+#[tauri::command]
+pub fn import_markdown_files(
+    db: State<'_, Mutex<Connection>>,
+    paths: Vec<String>,
+) -> Result<ImportResult, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let mut imported = 0u32;
+    let mut skipped = 0u32;
+
+    // Collect all .md file paths (support both files and directories)
+    let mut md_files: Vec<PathBuf> = Vec::new();
+    for path_str in &paths {
+        let path = PathBuf::from(path_str);
+        if path.is_dir() {
+            if let Ok(entries) = fs::read_dir(&path) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if p.extension().and_then(|e| e.to_str()) == Some("md") {
+                        md_files.push(p);
+                    }
+                }
+            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            md_files.push(path);
+        }
+    }
+
+    for md_path in &md_files {
+        match import_single_markdown(&conn, md_path) {
+            Ok(_) => imported += 1,
+            Err(e) => {
+                log::warn!("Skipped {}: {}", md_path.display(), e);
+                skipped += 1;
+            }
+        }
+    }
+
+    Ok(ImportResult { imported, skipped })
+}
+
+fn import_single_markdown(conn: &Connection, path: &Path) -> Result<Note, String> {
+    let raw = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+
+    // Determine if file has Bruin frontmatter or is a plain Bear export
+    let (title, body, file_tags) = if raw.starts_with("---") {
+        let file_note = icloud::import_file(path)?;
+        (file_note.title, file_note.content, file_note.tags)
+    } else {
+        let title = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Untitled")
+            .to_string();
+        let tags = extract_tags(&raw);
+        (title, raw, tags)
+    };
+
+    let id = Uuid::new_v4().to_string();
+    let now = Utc::now().to_rfc3339();
+    let word_count = compute_word_count(&body);
+
+    conn.execute(
+        "INSERT INTO notes (id, title, content, created_at, updated_at, word_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![id, title, body, now, now, word_count],
+    )
+    .map_err(|e| e.to_string())?;
+
+    sync_tags(conn, &id, &file_tags)?;
+    let note = fetch_note(conn, &id)?;
+    sync_to_icloud(conn, &note);
+    Ok(note)
 }

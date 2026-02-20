@@ -1,29 +1,115 @@
-use crate::sync::icloud;
-use notify::{Event, RecursiveMode, Watcher};
+use crate::sync::reconciler::SyncAction;
+use crate::sync::{icloud, reconciler};
+use notify::{Event, EventKind, RecursiveMode, Watcher};
+use rusqlite::Connection;
+use std::collections::HashMap;
 use std::fs;
-use tauri::AppHandle;
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter, Manager};
 
 pub fn start_watcher(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let icloud_dir = icloud::get_icloud_dir();
     fs::create_dir_all(&icloud_dir)?;
 
-    let _app_handle = app_handle.clone();
+    let (tx, rx) = mpsc::channel::<PathBuf>();
+
+    // File watcher sends events to channel
     let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
         match res {
-            Ok(event) => {
-                log::info!("File change detected: {:?}", event);
-                // Reconciliation will be triggered on next sync
-            }
+            Ok(event) => match event.kind {
+                EventKind::Create(_) | EventKind::Modify(_) => {
+                    for path in event.paths {
+                        if path.extension().and_then(|e| e.to_str()) == Some("md") {
+                            let _ = tx.send(path);
+                        }
+                    }
+                }
+                _ => {}
+            },
             Err(e) => {
                 log::error!("Watch error: {:?}", e);
             }
         }
     })?;
 
-    watcher.watch(&icloud_dir, RecursiveMode::Recursive)?;
-
-    // Leak the watcher so it lives for the duration of the app
+    watcher.watch(&icloud_dir, RecursiveMode::NonRecursive)?;
     std::mem::forget(watcher);
 
+    // Debounce thread: collect events and process after 500ms of quiet
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
+        let mut pending: HashMap<PathBuf, Instant> = HashMap::new();
+
+        loop {
+            match rx.recv_timeout(Duration::from_millis(200)) {
+                Ok(path) => {
+                    pending.insert(path, Instant::now());
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    let now = Instant::now();
+                    let ready: Vec<PathBuf> = pending
+                        .iter()
+                        .filter(|(_, t)| now.duration_since(**t) >= Duration::from_millis(500))
+                        .map(|(p, _)| p.clone())
+                        .collect();
+
+                    if ready.is_empty() {
+                        continue;
+                    }
+
+                    for path in &ready {
+                        pending.remove(path);
+                    }
+
+                    let db = app.state::<Mutex<Connection>>();
+                    if let Ok(conn) = db.lock() {
+                        for path in &ready {
+                            process_file_change(&conn, path);
+                        }
+                    }
+
+                    let _ = app.emit("sync-status-changed", ());
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+    });
+
     Ok(())
+}
+
+fn process_file_change(conn: &Connection, path: &PathBuf) {
+    if !path.exists() {
+        return;
+    }
+
+    match icloud::import_file(path) {
+        Ok(mut file_note) => {
+            file_note.sync_hash =
+                Some(icloud::compute_sync_hash(&file_note.title, &file_note.content));
+
+            let db_note = reconciler::fetch_note_by_id(conn, &file_note.id);
+            let action = reconciler::reconcile(db_note.as_ref(), &file_note);
+
+            match action {
+                SyncAction::Import => {
+                    if let Err(e) = reconciler::import_note_to_db(conn, &file_note) {
+                        log::warn!("Failed to import {:?}: {}", path, e);
+                    }
+                }
+                SyncAction::Export => {
+                    if let Some(ref db) = db_note {
+                        let _ = icloud::export_note(db);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to process file {:?}: {}", path, e);
+        }
+    }
 }
