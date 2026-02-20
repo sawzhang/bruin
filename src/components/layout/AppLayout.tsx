@@ -8,12 +8,14 @@ import { NoteList } from "./NoteList";
 import { EditorPanel } from "./EditorPanel";
 import { Resizer } from "../common/Resizer";
 import { CommandPalette } from "../search/CommandPalette";
+import { ThemePicker } from "../settings/ThemePicker";
 
 export function AppLayout() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
   const noteListWidth = useUIStore((s) => s.noteListWidth);
   const setSidebarWidth = useUIStore((s) => s.setSidebarWidth);
   const setNoteListWidth = useUIStore((s) => s.setNoteListWidth);
+  const theme = useUIStore((s) => s.theme);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadTags = useTagStore((s) => s.loadTags);
 
@@ -26,7 +28,7 @@ export function AppLayout() {
   }, [loadNotes, loadTags]);
 
   return (
-    <div className="h-full flex overflow-hidden">
+    <div className={`theme-${theme} h-full flex overflow-hidden bg-bear-bg text-bear-text`}>
       {/* Sidebar */}
       <div style={{ width: sidebarWidth }} className="shrink-0 h-full">
         <Sidebar />
@@ -46,8 +48,9 @@ export function AppLayout() {
         <EditorPanel />
       </div>
 
-      {/* Command Palette (overlay) */}
+      {/* Overlays */}
       <CommandPalette />
+      <ThemePicker />
     </div>
   );
 }

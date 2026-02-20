@@ -29,6 +29,13 @@ export function useKeyboard() {
         return;
       }
 
+      // Cmd+T: toggle theme picker
+      if (meta && e.key === "t") {
+        e.preventDefault();
+        useUIStore.getState().toggleThemePicker();
+        return;
+      }
+
       // Cmd+Backspace: trash selected note
       if (meta && e.key === "Backspace") {
         e.preventDefault();
@@ -37,9 +44,14 @@ export function useKeyboard() {
         return;
       }
 
-      // Escape: close command palette
+      // Escape: close overlays
       if (e.key === "Escape") {
         const ui = useUIStore.getState();
+        if (ui.isThemePickerOpen) {
+          e.preventDefault();
+          ui.toggleThemePicker();
+          return;
+        }
         if (ui.isCommandPaletteOpen) {
           e.preventDefault();
           ui.toggleCommandPalette();

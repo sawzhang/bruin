@@ -1,11 +1,37 @@
+import { useState, useEffect } from "react";
 import clsx from "clsx";
+import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 import { useTags } from "../../hooks/useTags";
 import { useNotes } from "../../hooks/useNotes";
+import { useUIStore } from "../../stores/uiStore";
 import { TagTree } from "../sidebar/TagTree";
+import { importMarkdownFiles, getSyncStatus } from "../../lib/tauri";
+import type { SyncState } from "../../types/sync";
 
 export function Sidebar() {
   const { tagTree, selectedTag, selectTag } = useTags();
   const { createNote, showTrash, setShowTrash, loadNotes } = useNotes();
+  const toggleThemePicker = useUIStore((s) => s.toggleThemePicker);
+
+  const [syncStatus, setSyncStatus] = useState<SyncState>({
+    is_syncing: false,
+    last_sync: null,
+    error: null,
+    files_synced: 0,
+  });
+
+  useEffect(() => {
+    getSyncStatus().then(setSyncStatus).catch(() => {});
+
+    const unlistenPromise = listen("sync-status-changed", () => {
+      getSyncStatus().then(setSyncStatus).catch(() => {});
+    });
+
+    return () => {
+      unlistenPromise.then((fn) => fn());
+    };
+  }, []);
 
   const handleAllNotes = () => {
     selectTag(null);
@@ -22,7 +48,6 @@ export function Sidebar() {
     selectTag(tag);
   };
 
-  // Reload notes when switching views
   const handleAllNotesClick = () => {
     handleAllNotes();
     loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
@@ -41,6 +66,35 @@ export function Sidebar() {
       loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
     }
   };
+
+  const handleImport = async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    });
+
+    if (selected) {
+      const paths = Array.isArray(selected) ? selected : [selected];
+      await importMarkdownFiles(paths);
+      loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+    }
+  };
+
+  const syncDotColor = syncStatus.error
+    ? "bg-red-500"
+    : syncStatus.is_syncing
+      ? "bg-yellow-500 animate-pulse"
+      : syncStatus.last_sync
+        ? "bg-green-500"
+        : "bg-gray-400";
+
+  const syncLabel = syncStatus.error
+    ? "Sync error"
+    : syncStatus.is_syncing
+      ? "Syncing..."
+      : syncStatus.last_sync
+        ? "Synced"
+        : "Not synced";
 
   return (
     <div className="h-full bg-bear-sidebar flex flex-col select-none">
@@ -137,11 +191,52 @@ export function Sidebar() {
         />
       </div>
 
-      {/* Sync status */}
-      <div className="px-3 py-2 border-t border-bear-border">
+      {/* Footer: sync status + import + settings gear */}
+      <div className="px-3 py-2 border-t border-bear-border flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-          <span className="text-[11px] text-bear-text-muted">Synced</span>
+          <span className={clsx("w-1.5 h-1.5 rounded-full", syncDotColor)} />
+          <span className="text-[11px] text-bear-text-muted">{syncLabel}</span>
+        </div>
+        <div className="flex items-center gap-0.5">
+          <button
+            onClick={handleImport}
+            title="Import Markdown Files"
+            className="w-6 h-6 flex items-center justify-center rounded text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M7 2v8" />
+              <path d="M4 7l3 3 3-3" />
+              <path d="M2 12h10" />
+            </svg>
+          </button>
+          <button
+            onClick={toggleThemePicker}
+            title="Themes (Cmd+T)"
+            className="w-6 h-6 flex items-center justify-center rounded text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <circle cx="7" cy="7" r="2.2" />
+              <path d="M7 1.5v1.2M7 11.3v1.2M1.5 7h1.2M11.3 7h1.2M2.8 2.8l.85.85M10.35 10.35l.85.85M11.2 2.8l-.85.85M3.65 10.35l-.85.85" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
