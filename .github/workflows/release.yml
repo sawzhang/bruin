@@ -65,6 +65,6 @@ jobs:
             | macOS | Intel | `.dmg` (x86_64) |
 
             > **Note**: If macOS shows "app is damaged", run: `xattr -cr /Applications/Bruin.app`
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: --target ${{ matrix.target }}
