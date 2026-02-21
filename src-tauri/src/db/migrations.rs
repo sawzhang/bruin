@@ -90,7 +90,6 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
         CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_notes_trashed ON notes(is_trashed);
         CREATE INDEX IF NOT EXISTS idx_notes_pinned_updated ON notes(is_pinned DESC, updated_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_notes_state ON notes(state);
         ",
     )?;
 
@@ -103,6 +102,9 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
     if !has_state_col {
         conn.execute_batch("ALTER TABLE notes ADD COLUMN state TEXT NOT NULL DEFAULT 'draft';")?;
     }
+
+    // Index on state (must be after column is added)
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_notes_state ON notes(state);")?;
 
     // Phase 2: Activity Feed
     conn.execute_batch(

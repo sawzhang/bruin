@@ -329,7 +329,11 @@ pub fn list_notes(
             .query_map(rusqlite::params![tag, trashed, limit, offset, ws_param], |row| {
                 let content: String = row.get(2)?;
                 let preview = if content.len() > 200 {
-                    content[..200].to_string()
+                    let mut end = 200;
+                    while !content.is_char_boundary(end) && end > 0 {
+                        end -= 1;
+                    }
+                    content[..end].to_string()
                 } else {
                     content
                 };
@@ -369,7 +373,11 @@ pub fn list_notes(
             .query_map(rusqlite::params![trashed, limit, offset, ws_param], |row| {
                 let content: String = row.get(2)?;
                 let preview = if content.len() > 200 {
-                    content[..200].to_string()
+                    let mut end = 200;
+                    while !content.is_char_boundary(end) && end > 0 {
+                        end -= 1;
+                    }
+                    content[..end].to_string()
                 } else {
                     content
                 };
