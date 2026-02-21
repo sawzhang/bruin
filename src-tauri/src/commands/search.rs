@@ -142,7 +142,11 @@ pub fn semantic_search(
 
         let tags = fetch_note_tags(&conn, &note_id)?;
         let preview = if note.1.len() > 200 {
-            note.1[..200].to_string()
+            let mut end = 200;
+            while !note.1.is_char_boundary(end) && end > 0 {
+                end -= 1;
+            }
+            note.1[..end].to_string()
         } else {
             note.1.clone()
         };

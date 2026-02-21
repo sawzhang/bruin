@@ -61,7 +61,11 @@ pub fn get_notes_by_tag(
         .query_map([&tag], |row| {
             let content: String = row.get(2)?;
             let preview = if content.len() > 200 {
-                content[..200].to_string()
+                let mut end = 200;
+                while !content.is_char_boundary(end) && end > 0 {
+                    end -= 1;
+                }
+                content[..end].to_string()
             } else {
                 content
             };
