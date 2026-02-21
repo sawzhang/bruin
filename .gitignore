@@ -47,3 +47,10 @@ coverage/
 # Tauri
 src-tauri/gen/
 WixTools/
+
+# Mobile (Expo / React Native)
+mobile/node_modules/
+mobile/.expo/
+mobile/ios/
+mobile/android/
+mobile/dist/
