@@ -1,3 +1,4 @@
+use crate::commands::sync::SyncState;
 use crate::sync::reconciler::SyncAction;
 use crate::sync::{icloud, reconciler};
 use notify::{Event, EventKind, RecursiveMode, RecommendedWatcher, Watcher};
@@ -163,6 +164,12 @@ pub fn start_watcher(app_handle: &AppHandle) -> Result<WatcherState, Box<dyn std
                                                 if !result.imported_note_ids.is_empty() {
                                                     let _ = app.emit("notes-imported", &result.imported_note_ids);
                                                 }
+                                                // Update SyncState so UI shows "Synced"
+                                                let sync_state = app.state::<Mutex<SyncState>>();
+                                                if let Ok(mut state) = sync_state.lock() {
+                                                    state.last_sync = Some(chrono::Utc::now().to_rfc3339());
+                                                    state.error = None;
+                                                };
                                             }
                                             Err(e) => log::error!("MCP trigger reconcile failed: {}", e),
                                         }
@@ -207,6 +214,12 @@ pub fn start_watcher(app_handle: &AppHandle) -> Result<WatcherState, Box<dyn std
                             for path in &ready_removes {
                                 process_file_removal(&conn, path);
                             }
+                            // Update SyncState so UI shows "Synced"
+                            let sync_state = app.state::<Mutex<SyncState>>();
+                            if let Ok(mut state) = sync_state.lock() {
+                                state.last_sync = Some(chrono::Utc::now().to_rfc3339());
+                                state.error = None;
+                            };
                         }
                         Err(e) => {
                             log::error!(

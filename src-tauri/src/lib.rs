@@ -27,8 +27,17 @@ pub fn run() {
                 {
                     let db = app_handle.state::<Mutex<rusqlite::Connection>>();
                     let conn = db.lock().map_err(|e: std::sync::PoisonError<_>| e.to_string())?;
-                    if let Err(e) = sync::reconciler::full_reconcile(&conn, None, None) {
-                        log::warn!("Initial sync failed: {}", e);
+                    match sync::reconciler::full_reconcile(&conn, None, None) {
+                        Ok(_) => {
+                            // Update SyncState so the UI shows "Synced"
+                            let sync_state = app_handle.state::<Mutex<SyncState>>();
+                            if let Ok(mut state) = sync_state.lock() {
+                                state.last_sync = Some(chrono::Utc::now().to_rfc3339());
+                            };
+                        }
+                        Err(e) => {
+                            log::warn!("Initial sync failed: {}", e);
+                        }
                     }
                 }
 
