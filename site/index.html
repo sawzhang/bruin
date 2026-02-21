@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bruin - Agent-Native Markdown Notes</title>
+  <meta name="description" content="A beautiful markdown note-taking app built for AI agents and loved by humans. MCP-first design, knowledge graph, semantic search." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ==================== NAV ==================== -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <svg class="nav-logo-icon" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="#d63031"/>
+          <path d="M8 10h6l2 4 2-4h6v12h-4v-7l-2.5 5h-3L12 15v7H8V10z" fill="#fff"/>
+        </svg>
+        <span>Bruin</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#mcp">MCP</a>
+        <a href="#architecture">How It Works</a>
+        <a href="https://github.com/anthropics/bruin" target="_blank" rel="noopener">GitHub</a>
+      </div>
+      <a href="#download" class="nav-cta">Download</a>
+    </div>
+  </nav>
+
+  <!-- ==================== HERO ==================== -->
+  <section class="hero">
+    <div class="hero-badge">Agent-Native &middot; Open Source</div>
+    <h1 class="hero-title">
+      Markdown notes<br/>for the <span class="hero-accent">agentic era</span>
+    </h1>
+    <p class="hero-subtitle">
+      A beautifully simple note-taking app where AI agents are first-class citizens.<br/>
+      Write with agents. Review as humans. Think in graphs.
+    </p>
+    <div class="hero-actions">
+      <a href="#download" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for Mac
+      </a>
+      <a href="#mcp" class="btn btn-ghost">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
+        MCP Server Docs
+      </a>
+    </div>
+
+    <!-- App Window Mockup -->
+    <div class="hero-window">
+      <div class="window-chrome">
+        <div class="window-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="window-title">Bruin</div>
+      </div>
+      <div class="window-body">
+        <div class="mock-sidebar">
+          <div class="mock-section-label">Workspaces</div>
+          <div class="mock-item active">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            Personal
+          </div>
+          <div class="mock-item">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4"/></svg>
+            Agent: Research
+          </div>
+          <div class="mock-section-label">Tags</div>
+          <div class="mock-item">#project/bruin</div>
+          <div class="mock-item">#ideas</div>
+          <div class="mock-item">#reading</div>
+        </div>
+        <div class="mock-list">
+          <div class="mock-note-item active">
+            <div class="mock-note-title">Architecture Notes</div>
+            <div class="mock-note-preview">MCP-first design enables agents...</div>
+            <div class="mock-note-meta">
+              <span class="mock-state published">published</span>
+              2 min ago
+            </div>
+          </div>
+          <div class="mock-note-item">
+            <div class="mock-note-title">Research: Vector DBs</div>
+            <div class="mock-note-preview">Comparing embedding strategies...</div>
+            <div class="mock-note-meta">
+              <span class="mock-state review">review</span>
+              1 hr ago
+            </div>
+          </div>
+          <div class="mock-note-item">
+            <div class="mock-note-title">Daily Note - Feb 21</div>
+            <div class="mock-note-preview">Today's focus: landing page...</div>
+            <div class="mock-note-meta">
+              <span class="mock-state draft">draft</span>
+              3 hr ago
+            </div>
+          </div>
+        </div>
+        <div class="mock-editor">
+          <div class="mock-editor-title">Architecture Notes</div>
+          <div class="mock-md">
+            <span class="md-h2">## MCP-First Design</span>
+            <br/><br/>
+            <span class="md-text">Bruin treats AI agents as </span><span class="md-bold">**first-class citizens**</span><span class="md-text">. Every capability available in the GUI is also available through the </span><span class="md-link">[[MCP Server]]</span><span class="md-text">.</span>
+            <br/><br/>
+            <span class="md-h3">### Agent Tools</span>
+            <br/><br/>
+            <span class="md-list">- </span><span class="md-code">`create_note`</span><span class="md-text"> - Create with full metadata</span><br/>
+            <span class="md-list">- </span><span class="md-code">`batch_create_notes`</span><span class="md-text"> - Atomic batch operations</span><br/>
+            <span class="md-list">- </span><span class="md-code">`semantic_search`</span><span class="md-text"> - Vector similarity</span><br/>
+            <span class="md-list">- </span><span class="md-code">`get_backlinks`</span><span class="md-text"> - Knowledge graph queries</span>
+            <br/><br/>
+            <span class="md-tag">#architecture</span> <span class="md-tag">#mcp</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== PHILOSOPHY ==================== -->
+  <section class="philosophy">
+    <div class="container">
+      <div class="philosophy-grid">
+        <div class="philosophy-card">
+          <div class="philosophy-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
+          </div>
+          <h3>Agent-Native</h3>
+          <p>Built from day one for AI agents. MCP server with 14 tools gives agents the same power as the GUI.</p>
+        </div>
+        <div class="philosophy-card">
+          <div class="philosophy-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 20l9-5-9-5-9 5 9 5z"/><path d="M12 12l9-5-9-5-9 5 9 5z"/></svg>
+          </div>
+          <h3>Human-Reviewed</h3>
+          <p>Notes flow through draft, review, and published states. Humans stay in control of what gets finalized.</p>
+        </div>
+        <div class="philosophy-card">
+          <div class="philosophy-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><circle cx="18" cy="6" r="3"/><line x1="8.5" y1="7.5" x2="15.5" y2="16.5"/><line x1="15.5" y1="7.5" x2="8.5" y2="16.5"/></svg>
+          </div>
+          <h3>Graph-Connected</h3>
+          <p>Wiki-links create a knowledge graph. See how ideas connect with force-directed visualization.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FEATURES ==================== -->
+  <section id="features" class="features">
+    <div class="container">
+
+      <!-- Feature 1: MCP Server -->
+      <div class="feature-row">
+        <div class="feature-text">
+          <div class="feature-label">MCP-First</div>
+          <h2>Built for agents,<br/>loved by humans</h2>
+          <p>
+            Bruin ships with a full Model Context Protocol server.
+            Claude, GPT, and any MCP-compatible agent can create notes,
+            search semantically, traverse the knowledge graph, and manage
+            workspaces &mdash; no GUI required.
+          </p>
+          <div class="feature-highlights">
+            <div class="feature-highlight">
+              <span class="feature-number">14</span>
+              <span>MCP tools</span>
+            </div>
+            <div class="feature-highlight">
+              <span class="feature-number">3</span>
+              <span>Agent tiers</span>
+            </div>
+            <div class="feature-highlight">
+              <span class="feature-number">0</span>
+              <span>GUI dependency</span>
+            </div>
+          </div>
+        </div>
+        <div class="feature-visual">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-dot red"></span>
+              <span class="code-dot yellow"></span>
+              <span class="code-dot green"></span>
+              <span class="code-title">mcp-server</span>
+            </div>
+            <pre><code><span class="code-comment">// Agent creates a research note</span>
+<span class="code-keyword">await</span> mcp.<span class="code-fn">call</span>(<span class="code-string">"create_note"</span>, {
+  <span class="code-prop">title</span>: <span class="code-string">"LLM Benchmarks Q1"</span>,
+  <span class="code-prop">content</span>: research_output,
+  <span class="code-prop">tags</span>: [<span class="code-string">"#research"</span>, <span class="code-string">"#llm"</span>],
+  <span class="code-prop">workspace</span>: <span class="code-string">"agent-research"</span>
+});
+
+<span class="code-comment">// Semantic search across all notes</span>
+<span class="code-keyword">const</span> results = <span class="code-keyword">await</span> mcp.<span class="code-fn">call</span>(
+  <span class="code-string">"semantic_search"</span>,
+  { <span class="code-prop">query</span>: <span class="code-string">"transformer architectures"</span> }
+);
+
+<span class="code-comment">// Traverse the knowledge graph</span>
+<span class="code-keyword">const</span> links = <span class="code-keyword">await</span> mcp.<span class="code-fn">call</span>(
+  <span class="code-string">"get_backlinks"</span>,
+  { <span class="code-prop">note_id</span>: results[<span class="code-number">0</span>].id }
+);</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 2: Knowledge Graph -->
+      <div class="feature-row reverse">
+        <div class="feature-text">
+          <div class="feature-label">Knowledge Graph</div>
+          <h2>See how your<br/>ideas connect</h2>
+          <p>
+            Link notes with <code>[[wiki-links]]</code> to build an organic knowledge graph.
+            The D3-powered force-directed visualization reveals hidden connections
+            between your ideas, research, and projects.
+          </p>
+          <ul class="feature-list">
+            <li>Bidirectional wiki-links with backlink tracking</li>
+            <li>Interactive force-directed graph visualization</li>
+            <li>BFS traversal with configurable depth</li>
+            <li>Tag-based node coloring</li>
+          </ul>
+        </div>
+        <div class="feature-visual">
+          <div class="graph-demo">
+            <svg class="graph-svg" viewBox="0 0 400 300">
+              <!-- Edges -->
+              <line x1="200" y1="130" x2="120" y2="80" stroke="#555" stroke-width="1"/>
+              <line x1="200" y1="130" x2="300" y2="90" stroke="#555" stroke-width="1"/>
+              <line x1="200" y1="130" x2="150" y2="210" stroke="#555" stroke-width="1"/>
+              <line x1="200" y1="130" x2="280" y2="200" stroke="#555" stroke-width="1"/>
+              <line x1="120" y1="80" x2="60" y2="140" stroke="#444" stroke-width="1"/>
+              <line x1="300" y1="90" x2="350" y2="160" stroke="#444" stroke-width="1"/>
+              <line x1="150" y1="210" x2="80" y2="250" stroke="#444" stroke-width="1"/>
+              <line x1="280" y1="200" x2="340" y2="250" stroke="#444" stroke-width="1"/>
+              <line x1="120" y1="80" x2="300" y2="90" stroke="#333" stroke-width="1" stroke-dasharray="4"/>
+              <!-- Center node -->
+              <circle cx="200" cy="130" r="20" fill="#d63031" opacity="0.9"/>
+              <text x="200" y="134" text-anchor="middle" fill="#fff" font-size="8" font-weight="600">MCP Design</text>
+              <!-- Level 1 nodes -->
+              <circle cx="120" cy="80" r="14" fill="#e17055" opacity="0.8"/>
+              <text x="120" y="83" text-anchor="middle" fill="#fff" font-size="7">Agents</text>
+              <circle cx="300" cy="90" r="14" fill="#e17055" opacity="0.8"/>
+              <text x="300" y="93" text-anchor="middle" fill="#fff" font-size="7">Search</text>
+              <circle cx="150" cy="210" r="14" fill="#e17055" opacity="0.8"/>
+              <text x="150" y="213" text-anchor="middle" fill="#fff" font-size="7">Sync</text>
+              <circle cx="280" cy="200" r="14" fill="#e17055" opacity="0.8"/>
+              <text x="280" y="203" text-anchor="middle" fill="#fff" font-size="7">Graph</text>
+              <!-- Level 2 nodes -->
+              <circle cx="60" cy="140" r="10" fill="#636e72" opacity="0.7"/>
+              <text x="60" y="143" text-anchor="middle" fill="#ddd" font-size="6">Claude</text>
+              <circle cx="350" cy="160" r="10" fill="#636e72" opacity="0.7"/>
+              <text x="350" y="163" text-anchor="middle" fill="#ddd" font-size="6">FTS5</text>
+              <circle cx="80" cy="250" r="10" fill="#636e72" opacity="0.7"/>
+              <text x="80" y="253" text-anchor="middle" fill="#ddd" font-size="6">iCloud</text>
+              <circle cx="340" cy="250" r="10" fill="#636e72" opacity="0.7"/>
+              <text x="340" y="253" text-anchor="middle" fill="#ddd" font-size="6">D3</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 3: Semantic Search -->
+      <div class="feature-row">
+        <div class="feature-text">
+          <div class="feature-label">Semantic Search</div>
+          <h2>Search by meaning,<br/>not just keywords</h2>
+          <p>
+            Powered by Hugging Face transformers, Bruin understands what you mean.
+            Combine vector similarity with full-text search, tag filters, date ranges,
+            and word count constraints in a single query.
+          </p>
+          <ul class="feature-list">
+            <li>Local embeddings &mdash; your data never leaves your machine</li>
+            <li>SQLite FTS5 for instant full-text search</li>
+            <li>Advanced query with boolean tag filters</li>
+            <li>Combined semantic + keyword ranking</li>
+          </ul>
+        </div>
+        <div class="feature-visual">
+          <div class="search-demo">
+            <div class="search-input">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span class="search-text">how do transformer attention mechanisms work</span>
+              <span class="search-badge">semantic</span>
+            </div>
+            <div class="search-results">
+              <div class="search-result">
+                <div class="search-result-title">Attention Is All You Need - Notes</div>
+                <div class="search-result-score">0.94</div>
+              </div>
+              <div class="search-result">
+                <div class="search-result-title">Multi-Head Attention Deep Dive</div>
+                <div class="search-result-score">0.89</div>
+              </div>
+              <div class="search-result">
+                <div class="search-result-title">Self-Attention vs Cross-Attention</div>
+                <div class="search-result-score">0.85</div>
+              </div>
+              <div class="search-result faded">
+                <div class="search-result-title">Transformer Architecture Overview</div>
+                <div class="search-result-score">0.81</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4: State Machine -->
+      <div class="feature-row reverse">
+        <div class="feature-text">
+          <div class="feature-label">Review Workflow</div>
+          <h2>Agents draft,<br/>humans approve</h2>
+          <p>
+            Every note has a state: draft, review, or published. Agents write into
+            draft workspaces, flag notes for review, and humans decide what gets
+            published. A simple, opinionated workflow for human-in-the-loop AI.
+          </p>
+          <ul class="feature-list">
+            <li>Three-state lifecycle: draft &rarr; review &rarr; published</li>
+            <li>Activity feed tracks every state transition</li>
+            <li>Webhook notifications on state changes</li>
+            <li>Per-workspace agent assignment</li>
+          </ul>
+        </div>
+        <div class="feature-visual">
+          <div class="state-demo">
+            <div class="state-flow">
+              <div class="state-node draft-node">
+                <div class="state-dot draft-dot"></div>
+                <span>Draft</span>
+                <span class="state-actor">Agent writes</span>
+              </div>
+              <div class="state-arrow">
+                <svg width="40" height="24" viewBox="0 0 40 24"><path d="M0 12h32m0 0l-6-6m6 6l-6 6" stroke="#555" stroke-width="1.5" fill="none"/></svg>
+              </div>
+              <div class="state-node review-node">
+                <div class="state-dot review-dot"></div>
+                <span>Review</span>
+                <span class="state-actor">Human checks</span>
+              </div>
+              <div class="state-arrow">
+                <svg width="40" height="24" viewBox="0 0 40 24"><path d="M0 12h32m0 0l-6-6m6 6l-6 6" stroke="#555" stroke-width="1.5" fill="none"/></svg>
+              </div>
+              <div class="state-node published-node">
+                <div class="state-dot published-dot"></div>
+                <span>Published</span>
+                <span class="state-actor">Ready to use</span>
+              </div>
+            </div>
+            <div class="state-activity">
+              <div class="activity-item">
+                <span class="activity-actor agent">agent</span>
+                <span>Created note "LLM Benchmarks"</span>
+                <span class="activity-time">2m ago</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-actor agent">agent</span>
+                <span>Changed state draft &rarr; review</span>
+                <span class="activity-time">2m ago</span>
+              </div>
+              <div class="activity-item">
+                <span class="activity-actor human">user</span>
+                <span>Changed state review &rarr; published</span>
+                <span class="activity-time">1m ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ==================== MORE FEATURES ==================== -->
+  <section class="more-features">
+    <div class="container">
+      <h2>And so much more</h2>
+      <div class="more-grid">
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <h4>Hierarchical Tags</h4>
+          <p>Nested tags like <code>#project/bruin/v2</code> with automatic tree navigation.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+          <h4>Workspaces</h4>
+          <p>Separate spaces for personal notes, agent output, and team projects.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <h4>Webhooks</h4>
+          <p>HMAC-signed HTTP callbacks on note events with exponential retry.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <h4>Templates</h4>
+          <p>Daily journals, meeting notes, and custom templates for quick starts.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.78 7.78 5.5 5.5 0 017.78-7.78zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          <h4>6 Themes</h4>
+          <p>Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <h4>iCloud Sync</h4>
+          <p>Bidirectional sync with conflict resolution. Your notes, everywhere.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MCP SECTION ==================== -->
+  <section id="mcp" class="mcp-section">
+    <div class="container">
+      <div class="mcp-header">
+        <div class="feature-label">Model Context Protocol</div>
+        <h2>Every agent tool, documented</h2>
+        <p class="mcp-intro">
+          Bruin's MCP server exposes 14 tools across three tiers.
+          Install it alongside Claude Code, Cursor, or any MCP-compatible client.
+        </p>
+      </div>
+
+      <div class="mcp-tiers">
+        <div class="mcp-tier">
+          <div class="mcp-tier-header">
+            <h3>Core</h3>
+            <span class="mcp-tier-badge">8 tools</span>
+          </div>
+          <div class="mcp-tool-list">
+            <div class="mcp-tool">
+              <code>create_note</code>
+              <span>Create with title, content, tags, workspace</span>
+            </div>
+            <div class="mcp-tool">
+              <code>read_note</code>
+              <span>Fetch full note by ID</span>
+            </div>
+            <div class="mcp-tool">
+              <code>update_note</code>
+              <span>Partial or full content update</span>
+            </div>
+            <div class="mcp-tool">
+              <code>delete_note</code>
+              <span>Soft-delete to trash or permanent</span>
+            </div>
+            <div class="mcp-tool">
+              <code>list_notes</code>
+              <span>Paginated listing with filters</span>
+            </div>
+            <div class="mcp-tool">
+              <code>search_notes</code>
+              <span>Full-text search with FTS5</span>
+            </div>
+            <div class="mcp-tool">
+              <code>list_tags</code>
+              <span>All tags with note counts</span>
+            </div>
+            <div class="mcp-tool">
+              <code>get_note_by_title</code>
+              <span>Lookup by exact title match</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mcp-tier">
+          <div class="mcp-tier-header">
+            <h3>Agent-Enhanced</h3>
+            <span class="mcp-tier-badge accent">5 tools</span>
+          </div>
+          <div class="mcp-tool-list">
+            <div class="mcp-tool">
+              <code>batch_create_notes</code>
+              <span>Atomic creation of multiple notes</span>
+            </div>
+            <div class="mcp-tool">
+              <code>append_to_note</code>
+              <span>Incremental writes, not full replace</span>
+            </div>
+            <div class="mcp-tool">
+              <code>get_backlinks</code>
+              <span>Query knowledge graph connections</span>
+            </div>
+            <div class="mcp-tool">
+              <code>get_daily_note</code>
+              <span>Idempotent access to today's note</span>
+            </div>
+            <div class="mcp-tool">
+              <code>advanced_query</code>
+              <span>Tags AND/OR, dates, word count, FTS</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mcp-tier">
+          <div class="mcp-tier-header">
+            <h3>Utilities</h3>
+            <span class="mcp-tier-badge">1 tool</span>
+          </div>
+          <div class="mcp-tool-list">
+            <div class="mcp-tool">
+              <code>import_markdown</code>
+              <span>Import .md files with frontmatter parsing</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mcp-install">
+        <div class="code-block compact">
+          <div class="code-header">
+            <span class="code-dot red"></span>
+            <span class="code-dot yellow"></span>
+            <span class="code-dot green"></span>
+            <span class="code-title">claude_desktop_config.json</span>
+          </div>
+          <pre><code>{
+  <span class="code-prop">"mcpServers"</span>: {
+    <span class="code-prop">"bruin"</span>: {
+      <span class="code-prop">"command"</span>: <span class="code-string">"npx"</span>,
+      <span class="code-prop">"args"</span>: [<span class="code-string">"bruin-mcp-server"</span>]
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== ARCHITECTURE ==================== -->
+  <section id="architecture" class="architecture">
+    <div class="container">
+      <div class="feature-label">Architecture</div>
+      <h2>How it all fits together</h2>
+      <div class="arch-diagram">
+        <div class="arch-col">
+          <div class="arch-box agent-box">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
+            <strong>AI Agent</strong>
+            <span>Claude, GPT, custom</span>
+          </div>
+          <div class="arch-connector">MCP Protocol</div>
+        </div>
+        <div class="arch-col">
+          <div class="arch-box core-box">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <strong>Bruin App</strong>
+            <span>Tauri + Rust + React</span>
+          </div>
+          <div class="arch-sub-grid">
+            <div class="arch-chip">SQLite</div>
+            <div class="arch-chip">FTS5</div>
+            <div class="arch-chip">Embeddings</div>
+            <div class="arch-chip">Graph</div>
+          </div>
+        </div>
+        <div class="arch-col">
+          <div class="arch-box human-box">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <strong>Human</strong>
+            <span>Review &amp; publish</span>
+          </div>
+          <div class="arch-connector">GUI / Editor</div>
+        </div>
+      </div>
+      <div class="arch-sync">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="1.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        <span>iCloud Sync &middot; Webhooks &middot; File Watcher</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TECH STACK ==================== -->
+  <section class="tech-stack">
+    <div class="container">
+      <h2>Built with</h2>
+      <div class="tech-grid">
+        <div class="tech-item">
+          <strong>Tauri 2</strong>
+          <span>Native desktop shell</span>
+        </div>
+        <div class="tech-item">
+          <strong>Rust</strong>
+          <span>Backend &amp; SQLite</span>
+        </div>
+        <div class="tech-item">
+          <strong>React 19</strong>
+          <span>Component UI</span>
+        </div>
+        <div class="tech-item">
+          <strong>Tiptap</strong>
+          <span>Markdown editor</span>
+        </div>
+        <div class="tech-item">
+          <strong>D3</strong>
+          <span>Graph visualization</span>
+        </div>
+        <div class="tech-item">
+          <strong>MCP SDK</strong>
+          <span>Agent protocol</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== DOWNLOAD ==================== -->
+  <section id="download" class="download">
+    <div class="container">
+      <h2>Get Bruin</h2>
+      <p>Free and open source. Download for macOS or build from source.</p>
+      <div class="download-actions">
+        <a href="#" class="btn btn-primary btn-lg">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+          Download for macOS
+        </a>
+        <a href="https://github.com/anthropics/bruin" class="btn btn-ghost btn-lg" target="_blank" rel="noopener">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          View Source
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <svg class="footer-logo" viewBox="0 0 32 32" fill="none">
+          <rect width="32" height="32" rx="8" fill="#d63031"/>
+          <path d="M8 10h6l2 4 2-4h6v12h-4v-7l-2.5 5h-3L12 15v7H8V10z" fill="#fff"/>
+        </svg>
+        <span>Bruin</span>
+      </div>
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#mcp">MCP Docs</a>
+        <a href="https://github.com/anthropics/bruin" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/anthropics/bruin/issues" target="_blank" rel="noopener">Issues</a>
+      </div>
+      <div class="footer-copy">
+        Built with Tauri, Rust, and a healthy respect for agents.
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
