@@ -9,7 +9,7 @@ import type {
 import * as tauri from "../lib/tauri";
 import { useTagStore } from "./tagStore";
 
-interface NoteState {
+interface NoteStoreState {
   notes: NoteListItem[];
   selectedNoteId: string | null;
   currentNote: Note | null;
@@ -27,7 +27,7 @@ interface NoteState {
   setShowTrash: (show: boolean) => void;
 }
 
-export const useNoteStore = create<NoteState>((set, get) => ({
+export const useNoteStore = create<NoteStoreState>((set, get) => ({
   notes: [],
   selectedNoteId: null,
   currentNote: null,

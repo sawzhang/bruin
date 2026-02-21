@@ -6,7 +6,6 @@ import * as d3Drag from "d3-drag";
 import { useGraphStore } from "../../stores/graphStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { GraphToolbar } from "./GraphToolbar";
-import type { GraphNode, GraphEdge } from "../../types/graph";
 
 interface SimNode extends d3Force.SimulationNodeDatum {
   id: string;

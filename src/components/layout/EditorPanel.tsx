@@ -125,7 +125,7 @@ export function EditorPanel() {
         <span className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full text-white ${STATE_COLORS[currentNote.state]}`}>
           {STATE_LABELS[currentNote.state]}
         </span>
-        {STATE_TRANSITIONS[currentNote.state].map((target) => (
+        {STATE_TRANSITIONS[currentNote.state].map((target: NoteState) => (
           <button
             key={target}
             onClick={() => setNoteState(currentNote.id, target)}
