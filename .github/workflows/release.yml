@@ -50,9 +50,9 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # To enable code signing, add these secrets to your repo:
-          # APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
-          # APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+          # Ad-hoc signing (no Apple Developer certificate needed)
+          # Replace with real identity + APPLE_CERTIFICATE secret for notarized builds
+          APPLE_SIGNING_IDENTITY: "-"
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "Bruin ${{ github.ref_name }}"
