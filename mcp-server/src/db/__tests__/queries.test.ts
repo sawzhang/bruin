@@ -487,7 +487,7 @@ describe("activityFeed", () => {
     const note1 = createNote("A", "Content A");
     createNote("B", "Content B");
     const events = getActivityFeed(50, note1.id);
-    expect(events.every((e: { note_id: string }) => e.note_id === note1.id)).toBe(true);
+    expect(events.every((e: { note_id: string | null }) => e.note_id === note1.id)).toBe(true);
   });
 });
 
