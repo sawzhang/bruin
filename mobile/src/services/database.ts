@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import { v4 as uuidv4 } from "uuid";
+import * as Crypto from "expo-crypto";
 import type {
   Note,
   NoteListItem,
@@ -338,7 +338,7 @@ export function createNote(
   db: SQLiteDatabase,
   params: CreateNoteParams
 ): Note {
-  const id = uuidv4();
+  const id = Crypto.randomUUID();
   const now = new Date().toISOString();
   const wordCount = countWords(params.content);
 

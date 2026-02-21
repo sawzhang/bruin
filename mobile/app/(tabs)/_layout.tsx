@@ -1,17 +1,16 @@
 import { Tabs } from "expo-router";
-import { useColorScheme } from "react-native";
+import { Text, useColorScheme } from "react-native";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Colors } from "@/constants";
 
-function TabBarIcon({ name, color }: { name: string; color: string }) {
-  // Simple text-based icons to avoid additional icon library dependency
-  const icons: Record<string, string> = {
-    notes: "📝",
-    search: "🔍",
-    settings: "⚙️",
-  };
-  const { Text } = require("react-native");
-  return <Text style={{ fontSize: 22 }}>{icons[name] ?? "●"}</Text>;
+const TAB_ICONS: Record<string, string> = {
+  notes: "\u{1F4DD}",
+  search: "\u{1F50D}",
+  settings: "\u2699\uFE0F",
+};
+
+function TabBarIcon({ name }: { name: string; color: string }) {
+  return <Text style={{ fontSize: 22 }}>{TAB_ICONS[name] ?? "\u25CF"}</Text>;
 }
 
 export default function TabsLayout() {

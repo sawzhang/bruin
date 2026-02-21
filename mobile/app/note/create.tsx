@@ -15,7 +15,8 @@ import * as Haptics from "expo-haptics";
 import { useDatabase } from "@/providers/DatabaseProvider";
 import { useNoteStore } from "@/stores/noteStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { Colors, Spacing, Typography, Radius } from "@/constants";
+import { createNote } from "@/services/database";
+import { Colors, Spacing, Radius } from "@/constants";
 
 export default function CreateNoteScreen() {
   const router = useRouter();
@@ -36,10 +37,7 @@ export default function CreateNoteScreen() {
     if (!title.trim() && !content.trim()) return;
 
     setDb(db);
-    const { createNote: _create, ...rest } = useNoteStore.getState();
-    // Direct database call for create to pass title/content
-    const database = require("@/services/database");
-    const note = database.createNote(db, {
+    const note = createNote(db, {
       title: title.trim() || "Untitled",
       content: content.trim(),
       tags: [],
