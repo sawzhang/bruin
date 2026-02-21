@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -79,7 +79,7 @@ jobs:
   build-tauri:
     name: Build (${{ matrix.platform }})
     needs: [test-frontend, test-mcp, check-rust]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     strategy:
       fail-fast: false
       matrix:
