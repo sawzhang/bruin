@@ -7,7 +7,7 @@ use commands::sync::SyncState;
 use sync::watcher::WatcherState;
 use db::migrations;
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -34,6 +34,8 @@ pub fn run() {
                             if let Ok(mut state) = sync_state.lock() {
                                 state.last_sync = Some(chrono::Utc::now().to_rfc3339());
                             };
+                            // Notify frontend to re-fetch sync status
+                            let _ = app_handle.emit("sync-status-changed", ());
                         }
                         Err(e) => {
                             log::warn!("Initial sync failed: {}", e);
