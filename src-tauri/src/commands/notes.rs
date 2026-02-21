@@ -164,7 +164,7 @@ pub(crate) fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<St
 pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash, state FROM notes WHERE id = ?1",
+            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash, state, workspace_id FROM notes WHERE id = ?1",
             [id],
             |row| {
                 Ok(Note {
@@ -180,6 +180,7 @@ pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
                     sync_hash: row.get(9)?,
                     tags: vec![],
                     state: row.get::<_, String>(10).unwrap_or_else(|_| "draft".to_string()),
+                    workspace_id: row.get(11)?,
                 })
             },
         )
@@ -213,12 +214,13 @@ pub fn create_note(
     let tags = extract_tags(&content);
 
     conn.execute(
-        "INSERT INTO notes (id, title, content, created_at, updated_at, word_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![id, title, content, now, now, word_count],
+        "INSERT INTO notes (id, title, content, created_at, updated_at, word_count, workspace_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![id, title, content, now, now, word_count, params.workspace_id],
     )
     .map_err(|e| e.to_string())?;
 
     sync_tags(&conn, &id, &tags)?;
+    sync_note_links(&conn, &id, &content)?;
     let note = fetch_note(&conn, &id)?;
     sync_to_icloud(&conn, &note);
     log_activity(&conn, "user", "note_created", Some(&id), &format!("Created note '{}'", note.title), "{}");
@@ -252,6 +254,7 @@ pub fn update_note(
     .map_err(|e| e.to_string())?;
 
     sync_tags(&conn, &params.id, &tags)?;
+    sync_note_links(&conn, &params.id, &content)?;
     let note = fetch_note(&conn, &params.id)?;
     sync_to_icloud(&conn, &note);
     log_activity(&conn, "user", "note_updated", Some(&params.id), &format!("Updated note '{}'", note.title), "{}");
@@ -301,21 +304,29 @@ pub fn list_notes(
 
     let mut items: Vec<NoteListItem> = Vec::new();
 
+    // Build workspace filter clause
+    let ws_clause = if params.workspace_id.is_some() {
+        "AND n.workspace_id = ?5"
+    } else {
+        "AND (?5 IS NULL OR 1=1)"
+    };
+    let ws_param = params.workspace_id.clone();
+
     if let Some(ref tag) = params.tag {
-        let mut stmt = conn
-            .prepare(
-                "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state \
-                 FROM notes n \
-                 JOIN note_tags nt ON n.id = nt.note_id \
-                 JOIN tags t ON nt.tag_id = t.id \
-                 WHERE t.name = ?1 AND n.is_trashed = ?2 \
-                 ORDER BY n.is_pinned DESC, n.updated_at DESC \
-                 LIMIT ?3 OFFSET ?4",
-            )
-            .map_err(|e| e.to_string())?;
+        let sql = format!(
+            "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state, n.workspace_id \
+             FROM notes n \
+             JOIN note_tags nt ON n.id = nt.note_id \
+             JOIN tags t ON nt.tag_id = t.id \
+             WHERE t.name = ?1 AND n.is_trashed = ?2 {} \
+             ORDER BY n.is_pinned DESC, n.updated_at DESC \
+             LIMIT ?3 OFFSET ?4",
+            ws_clause
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
         let rows = stmt
-            .query_map(rusqlite::params![tag, trashed, limit, offset], |row| {
+            .query_map(rusqlite::params![tag, trashed, limit, offset, ws_param], |row| {
                 let content: String = row.get(2)?;
                 let preview = if content.len() > 200 {
                     content[..200].to_string()
@@ -332,6 +343,7 @@ pub fn list_notes(
                     word_count: row.get(6)?,
                     tags: vec![],
                     state: row.get::<_, String>(7).unwrap_or_else(|_| "draft".to_string()),
+                    workspace_id: row.get(8)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -342,18 +354,19 @@ pub fn list_notes(
             items.push(item);
         }
     } else {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, title, content, updated_at, is_pinned, is_trashed, word_count, state \
-                 FROM notes \
-                 WHERE is_trashed = ?1 \
-                 ORDER BY is_pinned DESC, updated_at DESC \
-                 LIMIT ?2 OFFSET ?3",
-            )
-            .map_err(|e| e.to_string())?;
+        // Use 'n' alias for consistency with workspace clause
+        let sql = format!(
+            "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state, n.workspace_id \
+             FROM notes n \
+             WHERE n.is_trashed = ?1 {} \
+             ORDER BY n.is_pinned DESC, n.updated_at DESC \
+             LIMIT ?2 OFFSET ?3",
+            if params.workspace_id.is_some() { "AND n.workspace_id = ?4" } else { "AND (?4 IS NULL OR 1=1)" }
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
         let rows = stmt
-            .query_map(rusqlite::params![trashed, limit, offset], |row| {
+            .query_map(rusqlite::params![trashed, limit, offset, ws_param], |row| {
                 let content: String = row.get(2)?;
                 let preview = if content.len() > 200 {
                     content[..200].to_string()
@@ -370,6 +383,7 @@ pub fn list_notes(
                     word_count: row.get(6)?,
                     tags: vec![],
                     state: row.get::<_, String>(7).unwrap_or_else(|_| "draft".to_string()),
+                    workspace_id: row.get(8)?,
                 })
             })
             .map_err(|e| e.to_string())?;
@@ -521,6 +535,156 @@ pub fn import_markdown_files(
     }
 
     Ok(ImportResult { imported, skipped })
+}
+
+// --- Knowledge Graph: wiki-link sync ---
+
+pub(crate) fn sync_note_links(conn: &Connection, note_id: &str, content: &str) -> Result<(), String> {
+    let re = regex::Regex::new(r"\[\[([^\]]+)\]\]").unwrap();
+    let now = Utc::now().to_rfc3339();
+
+    // Remove existing links from this source
+    conn.execute("DELETE FROM note_links WHERE source_note_id = ?1", [note_id])
+        .map_err(|e| e.to_string())?;
+
+    for cap in re.captures_iter(content) {
+        let linked_title = &cap[1];
+        // Resolve title to note id
+        let target_id: Option<String> = conn
+            .query_row(
+                "SELECT id FROM notes WHERE title = ?1 AND is_trashed = 0",
+                [linked_title],
+                |row| row.get(0),
+            )
+            .ok();
+
+        if let Some(target_id) = target_id {
+            if target_id != note_id {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO note_links (source_note_id, target_note_id, link_type, created_at) VALUES (?1, ?2, 'wiki_link', ?3)",
+                    rusqlite::params![note_id, target_id, now],
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_knowledge_graph(
+    db: State<'_, Mutex<Connection>>,
+    center_note_id: Option<String>,
+    depth: Option<i32>,
+    max_nodes: Option<i32>,
+) -> Result<KnowledgeGraph, String> {
+    let conn = db.lock().map_err(|e| e.to_string())?;
+    let max = max_nodes.unwrap_or(200) as usize;
+    let depth_limit = depth.unwrap_or(2);
+
+    use std::collections::{HashMap, HashSet, VecDeque};
+
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<(String, i32)> = VecDeque::new();
+    let mut edges: Vec<GraphEdge> = Vec::new();
+
+    if let Some(ref center_id) = center_note_id {
+        queue.push_back((center_id.clone(), 0));
+        visited.insert(center_id.clone());
+    } else {
+        // No center: grab all linked notes
+        let mut stmt = conn
+            .prepare("SELECT DISTINCT source_note_id FROM note_links UNION SELECT DISTINCT target_note_id FROM note_links")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            if let Ok(id) = row {
+                if visited.len() < max {
+                    visited.insert(id.clone());
+                    queue.push_back((id, 0));
+                }
+            }
+        }
+    }
+
+    // BFS
+    while let Some((current_id, current_depth)) = queue.pop_front() {
+        if current_depth >= depth_limit {
+            continue;
+        }
+
+        // Forward links
+        let mut stmt = conn
+            .prepare("SELECT target_note_id, link_type FROM note_links WHERE source_note_id = ?1")
+            .map_err(|e| e.to_string())?;
+        let fwd: Vec<(String, String)> = stmt
+            .query_map([&current_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        for (target_id, link_type) in &fwd {
+            edges.push(GraphEdge {
+                source: current_id.clone(),
+                target: target_id.clone(),
+                link_type: link_type.clone(),
+            });
+            if !visited.contains(target_id) && visited.len() < max {
+                visited.insert(target_id.clone());
+                queue.push_back((target_id.clone(), current_depth + 1));
+            }
+        }
+
+        // Backward links
+        let mut stmt = conn
+            .prepare("SELECT source_note_id, link_type FROM note_links WHERE target_note_id = ?1")
+            .map_err(|e| e.to_string())?;
+        let bwd: Vec<(String, String)> = stmt
+            .query_map([&current_id], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        for (source_id, link_type) in &bwd {
+            edges.push(GraphEdge {
+                source: source_id.clone(),
+                target: current_id.clone(),
+                link_type: link_type.clone(),
+            });
+            if !visited.contains(source_id) && visited.len() < max {
+                visited.insert(source_id.clone());
+                queue.push_back((source_id.clone(), current_depth + 1));
+            }
+        }
+    }
+
+    // Deduplicate edges
+    let mut seen_edges: HashSet<(String, String, String)> = HashSet::new();
+    edges.retain(|e| seen_edges.insert((e.source.clone(), e.target.clone(), e.link_type.clone())));
+
+    // Build node info
+    let mut link_counts: HashMap<String, i64> = HashMap::new();
+    for e in &edges {
+        *link_counts.entry(e.source.clone()).or_insert(0) += 1;
+        *link_counts.entry(e.target.clone()).or_insert(0) += 1;
+    }
+
+    let mut nodes: Vec<GraphNode> = Vec::new();
+    for node_id in &visited {
+        let title: String = conn
+            .query_row("SELECT title FROM notes WHERE id = ?1", [node_id], |row| row.get(0))
+            .unwrap_or_else(|_| "Unknown".to_string());
+        let tags = fetch_note_tags(&conn, node_id).unwrap_or_default();
+        nodes.push(GraphNode {
+            id: node_id.clone(),
+            title,
+            link_count: *link_counts.get(node_id).unwrap_or(&0),
+            tags,
+        });
+    }
+
+    Ok(KnowledgeGraph { nodes, edges })
 }
 
 fn import_single_markdown(conn: &Connection, path: &Path) -> Result<Note, String> {

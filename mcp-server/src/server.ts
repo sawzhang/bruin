@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook } from "./db/queries.js";
+import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings } from "./db/queries.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -396,6 +396,123 @@ export function createServer(): McpServer {
       } catch (e: unknown) {
         return error((e as Error).message);
       }
+    }
+  );
+
+  // --- Phase 1: Workspace Tools ---
+
+  server.tool(
+    "create_workspace",
+    "Create a new workspace for organizing notes by agent or project",
+    {
+      name: z.string().describe("Unique workspace name"),
+      description: z.string().optional().describe("Description of the workspace"),
+      agent_id: z.string().optional().describe("Optional agent ID that owns this workspace"),
+    },
+    async (args) => {
+      try {
+        const workspace = createWorkspace(args.name, args.description, args.agent_id);
+        return text(workspace);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  server.tool(
+    "list_workspaces",
+    "List all workspaces",
+    {},
+    async () => {
+      const workspaces = listWorkspaces();
+      return text(workspaces);
+    }
+  );
+
+  server.tool(
+    "switch_workspace",
+    "Switch the current workspace context. All subsequent note operations will be scoped to this workspace. Pass null to clear workspace filter.",
+    {
+      workspace_id: z.string().nullable().describe("Workspace ID to switch to, or null to clear"),
+    },
+    async (args) => {
+      setCurrentWorkspace(args.workspace_id);
+      return text({ current_workspace_id: args.workspace_id, message: args.workspace_id ? `Switched to workspace '${args.workspace_id}'` : "Cleared workspace filter" });
+    }
+  );
+
+  server.tool(
+    "get_current_workspace",
+    "Get the currently active workspace ID",
+    {},
+    async () => {
+      return text({ current_workspace_id: getCurrentWorkspace() });
+    }
+  );
+
+  // --- Phase 2: Knowledge Graph Tools ---
+
+  server.tool(
+    "get_knowledge_graph",
+    "Get the knowledge graph of note connections via [[wiki-links]]. Returns nodes and edges for visualization.",
+    {
+      center_note_id: z.string().optional().describe("Note ID to center the graph on. If omitted, returns all linked notes."),
+      depth: z.number().optional().describe("BFS traversal depth from center note (default 2)"),
+      max_nodes: z.number().optional().describe("Maximum number of nodes to return (default 200)"),
+    },
+    async (args) => {
+      const graph = getKnowledgeGraph(args.center_note_id, args.depth ?? 2, args.max_nodes ?? 200);
+      return text(graph);
+    }
+  );
+
+  server.tool(
+    "get_forward_links",
+    "Get all notes that a given note links to via [[wiki-links]]",
+    {
+      note_id: z.string().describe("The UUID of the source note"),
+    },
+    async (args) => {
+      const links = getForwardLinks(args.note_id);
+      return text({ note_id: args.note_id, forward_link_count: links.length, links });
+    }
+  );
+
+  // --- Phase 3: Semantic Search Tools ---
+
+  server.tool(
+    "semantic_search",
+    "Search notes by meaning using vector embeddings. Requires embeddings to be generated first via reindex_embeddings.",
+    {
+      query_embedding: z.array(z.number()).describe("384-dimensional embedding vector of the search query"),
+      limit: z.number().optional().describe("Max results (default 10)"),
+      min_similarity: z.number().optional().describe("Minimum cosine similarity threshold (default 0.3)"),
+    },
+    async (args) => {
+      const results = semanticSearch(args.query_embedding, args.limit ?? 10, args.min_similarity ?? 0.3);
+      return text({ count: results.length, results });
+    }
+  );
+
+  server.tool(
+    "reindex_embeddings",
+    "Generate and store embeddings for all notes (or a specific note). Uses the all-MiniLM-L6-v2 model. Note: This is a placeholder that stores the embedding you provide.",
+    {
+      note_id: z.string().optional().describe("Specific note ID to reindex. If omitted, returns all note IDs that need reindexing."),
+      embedding: z.array(z.number()).optional().describe("The 384-dimensional embedding vector to store for the note"),
+    },
+    async (args) => {
+      if (args.note_id && args.embedding) {
+        upsertNoteEmbedding(args.note_id, args.embedding);
+        return text({ message: `Embedding stored for note '${args.note_id}'` });
+      }
+
+      // Return notes that need embeddings
+      const allNotes = listNotes(undefined, 1000, 0);
+      const existing = getAllEmbeddings();
+      const existingIds = new Set(existing.map((e) => e.note_id));
+      const needsEmbedding = allNotes.filter((n) => !existingIds.has(n.id));
+      return text({ total_notes: allNotes.length, indexed: existing.length, needs_indexing: needsEmbedding.length, note_ids: needsEmbedding.map((n) => n.id) });
     }
   );
 

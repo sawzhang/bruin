@@ -87,6 +87,7 @@ fn fetch_all_notes(conn: &Connection) -> Result<Vec<Note>, String> {
                 sync_hash: row.get(9)?,
                 tags: vec![],
                 state: "draft".to_string(),
+                workspace_id: None,
             })
         })
         .map_err(|e| e.to_string())?;

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useUIStore } from "../../stores/uiStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTagStore } from "../../stores/tagStore";
+import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { useKeyboard } from "../../hooks/useKeyboard";
 import { Sidebar } from "./Sidebar";
 import { NoteList } from "./NoteList";
@@ -11,6 +12,7 @@ import { CommandPalette } from "../search/CommandPalette";
 import { ThemePicker } from "../settings/ThemePicker";
 import { ActivityPanel } from "../activity/ActivityPanel";
 import { TemplatePicker } from "../templates/TemplatePicker";
+import { KnowledgeGraphView } from "../graph/KnowledgeGraphView";
 
 export function AppLayout() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -19,8 +21,10 @@ export function AppLayout() {
   const setNoteListWidth = useUIStore((s) => s.setNoteListWidth);
   const theme = useUIStore((s) => s.theme);
   const isActivityPanelOpen = useUIStore((s) => s.isActivityPanelOpen);
+  const isGraphViewOpen = useUIStore((s) => s.isGraphViewOpen);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadTags = useTagStore((s) => s.loadTags);
+  const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
 
   useKeyboard();
 
@@ -28,7 +32,8 @@ export function AppLayout() {
   useEffect(() => {
     loadNotes();
     loadTags();
-  }, [loadNotes, loadTags]);
+    loadWorkspaces();
+  }, [loadNotes, loadTags, loadWorkspaces]);
 
   return (
     <div className={`theme-${theme} h-full flex overflow-hidden bg-bear-bg text-bear-text`}>
@@ -39,17 +44,26 @@ export function AppLayout() {
 
       <Resizer onResize={(d) => setSidebarWidth(sidebarWidth + d)} />
 
-      {/* Note List */}
-      <div style={{ width: noteListWidth }} className="shrink-0 h-full">
-        <NoteList />
-      </div>
+      {isGraphViewOpen ? (
+        /* Knowledge Graph View */
+        <div className="flex-1 h-full min-w-0">
+          <KnowledgeGraphView />
+        </div>
+      ) : (
+        <>
+          {/* Note List */}
+          <div style={{ width: noteListWidth }} className="shrink-0 h-full">
+            <NoteList />
+          </div>
 
-      <Resizer onResize={(d) => setNoteListWidth(noteListWidth + d)} />
+          <Resizer onResize={(d) => setNoteListWidth(noteListWidth + d)} />
 
-      {/* Editor */}
-      <div className="flex-1 h-full min-w-0">
-        <EditorPanel />
-      </div>
+          {/* Editor */}
+          <div className="flex-1 h-full min-w-0">
+            <EditorPanel />
+          </div>
+        </>
+      )}
 
       {/* Activity Panel */}
       {isActivityPanelOpen && (

@@ -155,6 +155,52 @@ function ensureDatabase(): Database.Database {
     );
   }
 
+  // Phase 6: Workspaces
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      agent_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Add workspace_id column to notes (conditional)
+  const hasWorkspaceCol = db.prepare(
+    "SELECT COUNT(*) as cnt FROM pragma_table_info('notes') WHERE name='workspace_id'"
+  ).get() as { cnt: number };
+  if (hasWorkspaceCol.cnt === 0) {
+    db.exec("ALTER TABLE notes ADD COLUMN workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL;");
+  }
+
+  db.exec("CREATE INDEX IF NOT EXISTS idx_notes_workspace ON notes(workspace_id);");
+
+  // Phase 7: Knowledge Graph (note_links)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS note_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      target_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      link_type TEXT NOT NULL DEFAULT 'wiki_link',
+      created_at TEXT NOT NULL,
+      UNIQUE(source_note_id, target_note_id, link_type)
+    );
+    CREATE INDEX IF NOT EXISTS idx_note_links_source ON note_links(source_note_id);
+    CREATE INDEX IF NOT EXISTS idx_note_links_target ON note_links(target_note_id);
+  `);
+
+  // Phase 8: Semantic Search (note_embeddings)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS note_embeddings (
+      note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+      embedding TEXT NOT NULL,
+      model TEXT NOT NULL DEFAULT 'all-MiniLM-L6-v2',
+      updated_at TEXT NOT NULL
+    );
+  `);
+
   // Phase 1: Add state column to notes
   const hasStateCol = db.prepare(
     "SELECT COUNT(*) as cnt FROM pragma_table_info('notes') WHERE name='state'"

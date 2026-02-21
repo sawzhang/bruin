@@ -21,7 +21,8 @@ function createTestDb(): Database.Database {
       word_count INTEGER NOT NULL DEFAULT 0,
       file_path TEXT,
       sync_hash TEXT,
-      state TEXT NOT NULL DEFAULT 'draft'
+      state TEXT NOT NULL DEFAULT 'draft',
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -94,6 +95,31 @@ function createTestDb(): Database.Database {
       created_at TEXT NOT NULL DEFAULT '2026-01-01T00:00:00Z',
       last_triggered_at TEXT,
       failure_count INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS workspaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      agent_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS note_links (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      target_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      link_type TEXT NOT NULL DEFAULT 'wiki_link',
+      created_at TEXT NOT NULL,
+      UNIQUE(source_note_id, target_note_id, link_type)
+    );
+
+    CREATE TABLE IF NOT EXISTS note_embeddings (
+      note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+      embedding TEXT NOT NULL,
+      model TEXT NOT NULL DEFAULT 'all-MiniLM-L6-v2',
+      updated_at TEXT NOT NULL
     );
   `);
 
@@ -590,5 +616,221 @@ describe("advancedQuery", () => {
     const combined = advancedQuery({ tags: ["js"], min_word_count: 3 });
     expect(combined.length).toBe(1);
     expect(combined[0].title).toBe("Match");
+  });
+});
+
+// --- Phase 1: Workspace Tests ---
+
+describe("workspaces", () => {
+  it("creates a workspace", async () => {
+    const { createWorkspace } = await getQueries();
+    const ws = createWorkspace("Research", "Research workspace");
+    expect(ws.name).toBe("Research");
+    expect(ws.description).toBe("Research workspace");
+    expect(ws.id).toBeDefined();
+  });
+
+  it("lists workspaces", async () => {
+    const { createWorkspace, listWorkspaces } = await getQueries();
+    createWorkspace("Alpha");
+    createWorkspace("Beta");
+    const all = listWorkspaces();
+    expect(all.length).toBe(2);
+  });
+
+  it("deletes a workspace", async () => {
+    const { createWorkspace, deleteWorkspace, listWorkspaces } = await getQueries();
+    const ws = createWorkspace("ToDelete");
+    const result = deleteWorkspace(ws.id);
+    expect(result.success).toBe(true);
+    expect(listWorkspaces().length).toBe(0);
+  });
+
+  it("workspace-scoped note filtering", async () => {
+    const { createWorkspace, createNote, listNotes, setCurrentWorkspace } = await getQueries();
+    const ws = createWorkspace("Scoped");
+
+    // Create a note in the workspace
+    setCurrentWorkspace(ws.id);
+    createNote("In Workspace", "Content in workspace");
+
+    // Create a note outside the workspace
+    setCurrentWorkspace(null);
+    createNote("No Workspace", "Content without workspace");
+
+    // List all notes (no workspace filter)
+    const allNotes = listNotes();
+    expect(allNotes.length).toBe(2);
+
+    // List workspace-scoped notes
+    setCurrentWorkspace(ws.id);
+    const wsNotes = listNotes();
+    expect(wsNotes.length).toBe(1);
+    expect(wsNotes[0].title).toBe("In Workspace");
+
+    // Clean up
+    setCurrentWorkspace(null);
+  });
+
+  it("delete workspace nullifies notes workspace_id", async () => {
+    const { createWorkspace, deleteWorkspace, createNote, getNote, setCurrentWorkspace } = await getQueries();
+    const ws = createWorkspace("NullTest");
+
+    setCurrentWorkspace(ws.id);
+    const note = createNote("WS Note", "Content");
+    expect(note.workspace_id).toBe(ws.id);
+
+    setCurrentWorkspace(null);
+    deleteWorkspace(ws.id);
+
+    const updated = getNote(note.id);
+    expect(updated!.workspace_id).toBeNull();
+  });
+});
+
+// --- Phase 2: Knowledge Graph Tests ---
+
+describe("knowledgeGraph", () => {
+  it("extracts wiki links from content", async () => {
+    const { extractWikiLinks } = await getQueries();
+    const links = extractWikiLinks("See [[Note A]] and [[Note B]] for details");
+    expect(links).toContain("Note A");
+    expect(links).toContain("Note B");
+    expect(links.length).toBe(2);
+  });
+
+  it("extracts no links from plain text", async () => {
+    const { extractWikiLinks } = await getQueries();
+    const links = extractWikiLinks("No links here");
+    expect(links.length).toBe(0);
+  });
+
+  it("deduplicates wiki links", async () => {
+    const { extractWikiLinks } = await getQueries();
+    const links = extractWikiLinks("See [[Dup]] and [[Dup]] again");
+    expect(links.length).toBe(1);
+  });
+
+  it("syncNoteLinks creates links on create", async () => {
+    const { createNote, getForwardLinks } = await getQueries();
+    const target = createNote("Target Note", "I am target");
+    const source = createNote("Source Note", "Links to [[Target Note]]");
+
+    const links = getForwardLinks(source.id);
+    expect(links.length).toBe(1);
+    expect(links[0].title).toBe("Target Note");
+  });
+
+  it("syncNoteLinks updates links on update", async () => {
+    const { createNote, updateNote, getForwardLinks } = await getQueries();
+    const targetA = createNote("Target A", "Content A");
+    const targetB = createNote("Target B", "Content B");
+    const source = createNote("Linking Note", "See [[Target A]]");
+
+    let links = getForwardLinks(source.id);
+    expect(links.length).toBe(1);
+    expect(links[0].title).toBe("Target A");
+
+    // Update to link to Target B instead
+    updateNote(source.id, undefined, "Now see [[Target B]]");
+    links = getForwardLinks(source.id);
+    expect(links.length).toBe(1);
+    expect(links[0].title).toBe("Target B");
+  });
+
+  it("getKnowledgeGraph returns connected nodes and edges", async () => {
+    const { createNote, getKnowledgeGraph } = await getQueries();
+    const a = createNote("Node A", "Content");
+    const b = createNote("Node B", "Links to [[Node A]]");
+    const c = createNote("Node C", "Links to [[Node B]]");
+
+    const graph = getKnowledgeGraph(a.id, 3, 200);
+    expect(graph.nodes.length).toBeGreaterThanOrEqual(2);
+    expect(graph.edges.length).toBeGreaterThanOrEqual(1);
+
+    const nodeIds = graph.nodes.map((n: { id: string }) => n.id);
+    expect(nodeIds).toContain(a.id);
+    expect(nodeIds).toContain(b.id);
+  });
+
+  it("getKnowledgeGraph respects max_nodes", async () => {
+    const { createNote, getKnowledgeGraph } = await getQueries();
+    // Create a chain of linked notes
+    const notes = [];
+    for (let i = 0; i < 5; i++) {
+      notes.push(createNote(`Chain ${i}`, i > 0 ? `[[Chain ${i - 1}]]` : "Root"));
+    }
+
+    const graph = getKnowledgeGraph(notes[0].id, 10, 3);
+    expect(graph.nodes.length).toBeLessThanOrEqual(3);
+  });
+});
+
+// --- Phase 3: Semantic Search Tests ---
+
+describe("semanticSearch", () => {
+  it("upserts and retrieves embeddings", async () => {
+    const { createNote, upsertNoteEmbedding, getAllEmbeddings } = await getQueries();
+    const note = createNote("Embedded", "Content for embedding");
+    const mockEmbedding = Array.from({ length: 384 }, (_, i) => Math.sin(i));
+
+    upsertNoteEmbedding(note.id, mockEmbedding);
+
+    const all = getAllEmbeddings();
+    expect(all.length).toBe(1);
+    expect(all[0].note_id).toBe(note.id);
+    expect(all[0].embedding.length).toBe(384);
+  });
+
+  it("cosine similarity correctness", async () => {
+    const { cosineSimilarity } = await getQueries();
+
+    // Identical vectors = 1.0
+    const v = [1, 0, 0];
+    expect(cosineSimilarity(v, v)).toBeCloseTo(1.0);
+
+    // Orthogonal vectors = 0.0
+    expect(cosineSimilarity([1, 0, 0], [0, 1, 0])).toBeCloseTo(0.0);
+
+    // Opposite vectors = -1.0
+    expect(cosineSimilarity([1, 0, 0], [-1, 0, 0])).toBeCloseTo(-1.0);
+  });
+
+  it("semantic search returns results ordered by similarity", async () => {
+    const { createNote, upsertNoteEmbedding, semanticSearch, setCurrentWorkspace } = await getQueries();
+    setCurrentWorkspace(null);
+
+    const note1 = createNote("Similar", "Very similar content");
+    const note2 = createNote("Different", "Completely different topic");
+
+    // Create embeddings that are similar to query for note1 and different for note2
+    const queryEmb = Array.from({ length: 384 }, (_, i) => Math.sin(i * 0.1));
+    const similarEmb = Array.from({ length: 384 }, (_, i) => Math.sin(i * 0.1) + 0.01);
+    // Use a clearly different but still positive-similarity embedding
+    const differentEmb = Array.from({ length: 384 }, (_, i) => Math.sin(i * 0.1 + 2));
+
+    upsertNoteEmbedding(note1.id, similarEmb);
+    upsertNoteEmbedding(note2.id, differentEmb);
+
+    const results = semanticSearch(queryEmb, 10, -1.0);
+    expect(results.length).toBe(2);
+    // note1 should be more similar to query
+    expect(results[0].id).toBe(note1.id);
+    expect(results[0].similarity).toBeGreaterThan(results[1].similarity);
+  });
+
+  it("semantic search respects min_similarity threshold", async () => {
+    const { createNote, upsertNoteEmbedding, semanticSearch, setCurrentWorkspace } = await getQueries();
+    setCurrentWorkspace(null);
+
+    const note = createNote("Low Sim", "Content");
+    // Create an embedding very different from query
+    const queryEmb = Array.from({ length: 384 }, () => 1);
+    const differentEmb = Array.from({ length: 384 }, () => -1);
+
+    upsertNoteEmbedding(note.id, differentEmb);
+
+    const results = semanticSearch(queryEmb, 10, 0.5);
+    expect(results.length).toBe(0);
   });
 });

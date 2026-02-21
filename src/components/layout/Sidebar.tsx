@@ -6,6 +6,7 @@ import { useTags } from "../../hooks/useTags";
 import { useNotes } from "../../hooks/useNotes";
 import { useUIStore } from "../../stores/uiStore";
 import { TagTree } from "../sidebar/TagTree";
+import { WorkspaceSelector } from "../sidebar/WorkspaceSelector";
 import { importMarkdownFiles, getSyncStatus } from "../../lib/tauri";
 import type { SyncState } from "../../types/sync";
 
@@ -15,6 +16,8 @@ export function Sidebar() {
   const toggleThemePicker = useUIStore((s) => s.toggleThemePicker);
   const toggleActivityPanel = useUIStore((s) => s.toggleActivityPanel);
   const isActivityPanelOpen = useUIStore((s) => s.isActivityPanelOpen);
+  const toggleGraphView = useUIStore((s) => s.toggleGraphView);
+  const isGraphViewOpen = useUIStore((s) => s.isGraphViewOpen);
 
   const [syncStatus, setSyncStatus] = useState<SyncState>({
     is_syncing: false,
@@ -125,6 +128,11 @@ export function Sidebar() {
         </button>
       </div>
 
+      {/* Workspace selector */}
+      <div className="px-2 pb-1">
+        <WorkspaceSelector />
+      </div>
+
       {/* Nav items */}
       <div className="px-2 flex flex-col gap-0.5">
         <button
@@ -194,6 +202,31 @@ export function Sidebar() {
             <path d="M2 3h10M2 7h7M2 11h5" />
           </svg>
           Activity
+        </button>
+        <button
+          onClick={toggleGraphView}
+          className={clsx(
+            "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
+            isGraphViewOpen
+              ? "bg-bear-active text-bear-text"
+              : "text-bear-text-secondary hover:bg-bear-hover hover:text-bear-text",
+          )}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+          >
+            <circle cx="4" cy="4" r="2" />
+            <circle cx="10" cy="4" r="2" />
+            <circle cx="7" cy="10" r="2" />
+            <line x1="5.5" y1="5.2" x2="7" y2="8.5" />
+            <line x1="8.5" y1="5.2" x2="7" y2="8.5" />
+          </svg>
+          Knowledge Graph
         </button>
       </div>
 

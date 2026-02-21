@@ -12,6 +12,8 @@ import type { Tag } from "../types/tag";
 import type { ActivityEvent } from "../types/activity";
 import type { SyncState } from "../types/sync";
 import type { Template } from "../types/template";
+import type { Workspace } from "../types/workspace";
+import type { KnowledgeGraph } from "../types/graph";
 
 // Note commands
 export async function createNote(params: CreateNoteParams): Promise<Note> {
@@ -104,6 +106,59 @@ export async function getActivityFeed(
   noteId?: string,
 ): Promise<ActivityEvent[]> {
   return invoke("get_activity_feed", { limit: limit ?? 50, noteId });
+}
+
+// Workspace commands
+export async function createWorkspace(
+  name: string,
+  description?: string,
+  agentId?: string,
+): Promise<Workspace> {
+  return invoke("create_workspace", {
+    name,
+    description: description ?? "",
+    agentId: agentId ?? null,
+  });
+}
+
+export async function listWorkspaces(): Promise<Workspace[]> {
+  return invoke("list_workspaces");
+}
+
+export async function deleteWorkspace(id: string): Promise<void> {
+  return invoke("delete_workspace", { id });
+}
+
+// Knowledge Graph commands
+export async function getKnowledgeGraph(
+  centerNoteId?: string,
+  depth?: number,
+  maxNodes?: number,
+): Promise<KnowledgeGraph> {
+  return invoke("get_knowledge_graph", {
+    centerNoteId: centerNoteId ?? null,
+    depth: depth ?? 2,
+    maxNodes: maxNodes ?? 200,
+  });
+}
+
+// Semantic Search commands
+export async function semanticSearch(
+  queryEmbedding: number[],
+  limit?: number,
+): Promise<
+  Array<{
+    id: string;
+    title: string;
+    preview: string;
+    similarity: number;
+    tags: string[];
+  }>
+> {
+  return invoke("semantic_search", {
+    queryEmbedding,
+    limit: limit ?? 10,
+  });
 }
 
 // Import commands

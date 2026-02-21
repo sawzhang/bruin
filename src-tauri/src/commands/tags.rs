@@ -48,7 +48,7 @@ pub fn get_notes_by_tag(
     let conn = db.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state \
+            "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state, n.workspace_id \
              FROM notes n \
              JOIN note_tags nt ON n.id = nt.note_id \
              JOIN tags t ON nt.tag_id = t.id \
@@ -75,6 +75,7 @@ pub fn get_notes_by_tag(
                 word_count: row.get(6)?,
                 tags: vec![],
                 state: row.get::<_, String>(7).unwrap_or_else(|_| "draft".to_string()),
+                workspace_id: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;

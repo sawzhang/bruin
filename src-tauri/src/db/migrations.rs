@@ -153,6 +153,62 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
         ",
     )?;
 
+    // Phase 6: Workspaces
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS workspaces (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT NOT NULL DEFAULT '',
+            agent_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        ",
+    )?;
+
+    // Add workspace_id column to notes (conditional)
+    let has_workspace_col: bool = conn
+        .prepare("SELECT COUNT(*) FROM pragma_table_info('notes') WHERE name='workspace_id'")?
+        .query_row([], |row| row.get::<_, i64>(0))
+        .unwrap_or(0)
+        > 0;
+    if !has_workspace_col {
+        conn.execute_batch("ALTER TABLE notes ADD COLUMN workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL;")?;
+    }
+
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_notes_workspace ON notes(workspace_id);",
+    )?;
+
+    // Phase 7: Knowledge Graph (note_links)
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS note_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+            target_note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+            link_type TEXT NOT NULL DEFAULT 'wiki_link',
+            created_at TEXT NOT NULL,
+            UNIQUE(source_note_id, target_note_id, link_type)
+        );
+        CREATE INDEX IF NOT EXISTS idx_note_links_source ON note_links(source_note_id);
+        CREATE INDEX IF NOT EXISTS idx_note_links_target ON note_links(target_note_id);
+        ",
+    )?;
+
+    // Phase 8: Semantic Search (note_embeddings)
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS note_embeddings (
+            note_id TEXT PRIMARY KEY REFERENCES notes(id) ON DELETE CASCADE,
+            embedding TEXT NOT NULL,
+            model TEXT NOT NULL DEFAULT 'all-MiniLM-L6-v2',
+            updated_at TEXT NOT NULL
+        );
+        ",
+    )?;
+
     // Seed default templates if table is empty
     let template_count: i64 = conn
         .prepare("SELECT COUNT(*) FROM templates")?

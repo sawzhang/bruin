@@ -17,6 +17,29 @@ export interface NoteRow {
   file_path: string | null;
   sync_hash: string | null;
   state: string;
+  workspace_id: string | null;
+}
+
+// --- Workspace types ---
+
+export interface WorkspaceRow {
+  id: string;
+  name: string;
+  description: string;
+  agent_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Current workspace state for MCP server
+let currentWorkspaceId: string | null = null;
+
+export function setCurrentWorkspace(workspaceId: string | null): void {
+  currentWorkspaceId = workspaceId;
+}
+
+export function getCurrentWorkspace(): string | null {
+  return currentWorkspaceId;
 }
 
 export interface TagRow {
@@ -140,6 +163,38 @@ export function syncNoteTags(noteId: string, tags: string[]): void {
   }
 }
 
+// --- Workspace CRUD ---
+
+export function createWorkspace(
+  name: string,
+  description = "",
+  agentId?: string
+): WorkspaceRow {
+  const id = uuidv4();
+  const timestamp = now();
+  db.prepare(
+    "INSERT INTO workspaces (id, name, description, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, name, description, agentId ?? null, timestamp, timestamp);
+  logActivity("agent", "workspace_created", null, `Created workspace '${name}'`);
+  return { id, name, description, agent_id: agentId ?? null, created_at: timestamp, updated_at: timestamp };
+}
+
+export function listWorkspaces(): WorkspaceRow[] {
+  return db.prepare("SELECT * FROM workspaces ORDER BY name").all() as WorkspaceRow[];
+}
+
+export function deleteWorkspace(id: string): { success: boolean; message: string } {
+  const existing = db.prepare("SELECT id FROM workspaces WHERE id = ?").get(id);
+  if (!existing) {
+    return { success: false, message: `Workspace '${id}' not found` };
+  }
+  db.prepare("DELETE FROM workspaces WHERE id = ?").run(id);
+  logActivity("agent", "workspace_deleted", null, `Deleted workspace '${id}'`);
+  return { success: true, message: `Workspace '${id}' deleted` };
+}
+
+// --- Notes ---
+
 export function createNote(
   title: string,
   content: string,
@@ -152,11 +207,12 @@ export function createNote(
   const allTags = tags ?? extractTags(content);
 
   db.prepare(
-    `INSERT INTO notes (id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count)
-     VALUES (?, ?, ?, ?, ?, 0, 0, ?)`
-  ).run(id, title, content, timestamp, timestamp, wc);
+    `INSERT INTO notes (id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, workspace_id)
+     VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?)`
+  ).run(id, title, content, timestamp, timestamp, wc, currentWorkspaceId);
 
   syncNoteTags(id, allTags);
+  syncNoteLinks(id, content);
 
   logActivity("agent", "note_created", id, `Created note '${title}'`);
 
@@ -172,6 +228,7 @@ export function createNote(
     file_path: null,
     sync_hash: null,
     state: "draft",
+    workspace_id: currentWorkspaceId,
     tags: allTags,
   };
 }
@@ -229,6 +286,10 @@ export function updateNote(
     syncNoteTags(id, tags);
   } else if (content !== undefined) {
     syncNoteTags(id, extractTags(newContent));
+  }
+
+  if (content !== undefined) {
+    syncNoteLinks(id, newContent);
   }
 
   logActivity("agent", "note_updated", id, `Updated note '${newTitle}'`);
@@ -305,27 +366,29 @@ export function listNotes(
   tags: string[];
 }> {
   let rows: NoteRow[];
+  const wsFilter = currentWorkspaceId !== null;
+  const wsClause = wsFilter ? "AND n.workspace_id = ?" : "";
 
   if (tag) {
-    rows = db
-      .prepare(
-        `SELECT n.* FROM notes n
+    const sql = `SELECT n.* FROM notes n
          JOIN note_tags nt ON nt.note_id = n.id
          JOIN tags t ON t.id = nt.tag_id
-         WHERE t.name = ? AND n.is_trashed = 0
+         WHERE t.name = ? AND n.is_trashed = 0 ${wsClause}
          ORDER BY n.updated_at DESC
-         LIMIT ? OFFSET ?`
-      )
-      .all(tag, limit, offset) as NoteRow[];
+         LIMIT ? OFFSET ?`;
+    const params = wsFilter
+      ? [tag, currentWorkspaceId, limit, offset]
+      : [tag, limit, offset];
+    rows = db.prepare(sql).all(...params) as NoteRow[];
   } else {
-    rows = db
-      .prepare(
-        `SELECT * FROM notes
-         WHERE is_trashed = 0
-         ORDER BY updated_at DESC
-         LIMIT ? OFFSET ?`
-      )
-      .all(limit, offset) as NoteRow[];
+    const sql = `SELECT n.* FROM notes n
+         WHERE n.is_trashed = 0 ${wsClause}
+         ORDER BY n.updated_at DESC
+         LIMIT ? OFFSET ?`;
+    const params = wsFilter
+      ? [currentWorkspaceId, limit, offset]
+      : [limit, offset];
+    rows = db.prepare(sql).all(...params) as NoteRow[];
   }
 
   return rows.map((row) => ({
@@ -348,16 +411,22 @@ export function searchNotes(
   updated_at: string;
   tags: string[];
 }> {
-  const ftsRows = db
-    .prepare(
-      `SELECT rowid,
+  const wsFilter = currentWorkspaceId !== null;
+  const wsClause = wsFilter ? "AND n.workspace_id = ?" : "";
+
+  const sql = `SELECT fts.rowid,
               highlight(notes_fts, 0, '<b>', '</b>') as title_hl,
               highlight(notes_fts, 1, '<b>', '</b>') as content_hl
-       FROM notes_fts
-       WHERE notes_fts MATCH ?
-       LIMIT ? OFFSET ?`
-    )
-    .all(query, limit, offset) as Array<{
+       FROM notes_fts fts
+       JOIN notes n ON n.rowid = fts.rowid
+       WHERE notes_fts MATCH ? ${wsClause}
+       LIMIT ? OFFSET ?`;
+
+  const params = wsFilter
+    ? [query, currentWorkspaceId, limit, offset]
+    : [query, limit, offset];
+
+  const ftsRows = db.prepare(sql).all(...params) as Array<{
     rowid: number;
     title_hl: string;
     content_hl: string;
@@ -829,4 +898,211 @@ export function advancedQuery(
     is_pinned: row.is_pinned,
     tags: getTagsForNote(row.id),
   }));
+}
+
+// --- Knowledge Graph ---
+
+const WIKI_LINK_REGEX = /\[\[([^\]]+)\]\]/g;
+
+export function extractWikiLinks(content: string): string[] {
+  const links = new Set<string>();
+  let match: RegExpExecArray | null;
+  const re = new RegExp(WIKI_LINK_REGEX.source, "g");
+  while ((match = re.exec(content)) !== null) {
+    links.add(match[1]);
+  }
+  return Array.from(links);
+}
+
+export function syncNoteLinks(noteId: string, content: string): void {
+  const timestamp = now();
+
+  // Remove existing links from this source
+  db.prepare("DELETE FROM note_links WHERE source_note_id = ?").run(noteId);
+
+  const linkedTitles = extractWikiLinks(content);
+  for (const title of linkedTitles) {
+    const target = db.prepare(
+      "SELECT id FROM notes WHERE title = ? AND is_trashed = 0"
+    ).get(title) as { id: string } | undefined;
+
+    if (target && target.id !== noteId) {
+      db.prepare(
+        "INSERT OR IGNORE INTO note_links (source_note_id, target_note_id, link_type, created_at) VALUES (?, ?, 'wiki_link', ?)"
+      ).run(noteId, target.id, timestamp);
+    }
+  }
+}
+
+export function getForwardLinks(
+  noteId: string
+): Array<{ id: string; title: string; link_type: string }> {
+  return db.prepare(
+    `SELECT n.id, n.title, nl.link_type
+     FROM note_links nl
+     JOIN notes n ON n.id = nl.target_note_id
+     WHERE nl.source_note_id = ?`
+  ).all(noteId) as Array<{ id: string; title: string; link_type: string }>;
+}
+
+export function getKnowledgeGraph(
+  centerNoteId?: string,
+  depth = 2,
+  maxNodes = 200
+): { nodes: Array<{ id: string; title: string; link_count: number; tags: string[] }>; edges: Array<{ source: string; target: string; link_type: string }> } {
+  const visited = new Set<string>();
+  const queue: Array<{ id: string; depth: number }> = [];
+  const edges: Array<{ source: string; target: string; link_type: string }> = [];
+
+  if (centerNoteId) {
+    queue.push({ id: centerNoteId, depth: 0 });
+    visited.add(centerNoteId);
+  } else {
+    // Get all linked note IDs
+    const linked = db.prepare(
+      "SELECT DISTINCT source_note_id as id FROM note_links UNION SELECT DISTINCT target_note_id as id FROM note_links"
+    ).all() as Array<{ id: string }>;
+    for (const { id } of linked) {
+      if (visited.size < maxNodes) {
+        visited.add(id);
+        queue.push({ id, depth: 0 });
+      }
+    }
+  }
+
+  // BFS
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current.depth >= depth) continue;
+
+    // Forward links
+    const fwd = db.prepare(
+      "SELECT target_note_id, link_type FROM note_links WHERE source_note_id = ?"
+    ).all(current.id) as Array<{ target_note_id: string; link_type: string }>;
+
+    for (const { target_note_id, link_type } of fwd) {
+      edges.push({ source: current.id, target: target_note_id, link_type });
+      if (!visited.has(target_note_id) && visited.size < maxNodes) {
+        visited.add(target_note_id);
+        queue.push({ id: target_note_id, depth: current.depth + 1 });
+      }
+    }
+
+    // Backward links
+    const bwd = db.prepare(
+      "SELECT source_note_id, link_type FROM note_links WHERE target_note_id = ?"
+    ).all(current.id) as Array<{ source_note_id: string; link_type: string }>;
+
+    for (const { source_note_id, link_type } of bwd) {
+      edges.push({ source: source_note_id, target: current.id, link_type });
+      if (!visited.has(source_note_id) && visited.size < maxNodes) {
+        visited.add(source_note_id);
+        queue.push({ id: source_note_id, depth: current.depth + 1 });
+      }
+    }
+  }
+
+  // Deduplicate edges
+  const edgeSet = new Set<string>();
+  const uniqueEdges = edges.filter((e) => {
+    const key = `${e.source}:${e.target}:${e.link_type}`;
+    if (edgeSet.has(key)) return false;
+    edgeSet.add(key);
+    return true;
+  });
+
+  // Count links per node
+  const linkCounts = new Map<string, number>();
+  for (const e of uniqueEdges) {
+    linkCounts.set(e.source, (linkCounts.get(e.source) ?? 0) + 1);
+    linkCounts.set(e.target, (linkCounts.get(e.target) ?? 0) + 1);
+  }
+
+  // Build nodes
+  const nodes = Array.from(visited).map((id) => {
+    const note = db.prepare("SELECT title FROM notes WHERE id = ?").get(id) as { title: string } | undefined;
+    return {
+      id,
+      title: note?.title ?? "Unknown",
+      link_count: linkCounts.get(id) ?? 0,
+      tags: getTagsForNote(id),
+    };
+  });
+
+  return { nodes, edges: uniqueEdges };
+}
+
+// --- Semantic Search ---
+
+export function upsertNoteEmbedding(
+  noteId: string,
+  embedding: number[],
+  model = "all-MiniLM-L6-v2"
+): void {
+  const timestamp = now();
+  db.prepare(
+    `INSERT INTO note_embeddings (note_id, embedding, model, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(note_id) DO UPDATE SET embedding = ?, model = ?, updated_at = ?`
+  ).run(noteId, JSON.stringify(embedding), model, timestamp, JSON.stringify(embedding), model, timestamp);
+}
+
+export function getAllEmbeddings(): Array<{ note_id: string; embedding: number[] }> {
+  const rows = db.prepare(
+    "SELECT note_id, embedding FROM note_embeddings"
+  ).all() as Array<{ note_id: string; embedding: string }>;
+
+  return rows.map((r) => ({
+    note_id: r.note_id,
+    embedding: JSON.parse(r.embedding),
+  }));
+}
+
+export function cosineSimilarity(a: number[], b: number[]): number {
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dotProduct / denom;
+}
+
+export function semanticSearch(
+  queryEmbedding: number[],
+  limit = 10,
+  minSimilarity = 0.3
+): Array<{ id: string; title: string; preview: string; similarity: number; tags: string[] }> {
+  const allEmbeddings = getAllEmbeddings();
+
+  const results: Array<{ note_id: string; similarity: number }> = [];
+  for (const { note_id, embedding } of allEmbeddings) {
+    // Apply workspace filter if set
+    if (currentWorkspaceId !== null) {
+      const note = db.prepare("SELECT workspace_id FROM notes WHERE id = ?").get(note_id) as { workspace_id: string | null } | undefined;
+      if (note && note.workspace_id !== currentWorkspaceId) continue;
+    }
+
+    const sim = cosineSimilarity(queryEmbedding, embedding);
+    if (sim >= minSimilarity) {
+      results.push({ note_id, similarity: sim });
+    }
+  }
+
+  // Sort by similarity descending
+  results.sort((a, b) => b.similarity - a.similarity);
+
+  return results.slice(0, limit).map(({ note_id, similarity }) => {
+    const note = db.prepare("SELECT * FROM notes WHERE id = ?").get(note_id) as NoteRow;
+    return {
+      id: note.id,
+      title: note.title,
+      preview: note.content.slice(0, 200),
+      similarity: Math.round(similarity * 1000) / 1000,
+      tags: getTagsForNote(note.id),
+    };
+  });
 }

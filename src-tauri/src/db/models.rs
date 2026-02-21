@@ -14,6 +14,7 @@ pub struct Note {
     pub sync_hash: Option<String>,
     pub tags: Vec<String>,
     pub state: String,
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +28,7 @@ pub struct NoteListItem {
     pub word_count: i64,
     pub tags: Vec<String>,
     pub state: String,
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,10 +74,46 @@ pub struct ActivityEvent {
     pub data: String,
 }
 
+// --- Workspaces ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Workspace {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub agent_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// --- Knowledge Graph ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphNode {
+    pub id: String,
+    pub title: String,
+    pub link_count: i64,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphEdge {
+    pub source: String,
+    pub target: String,
+    pub link_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KnowledgeGraph {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateNoteParams {
     pub title: Option<String>,
     pub content: Option<String>,
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +131,7 @@ pub struct ListNotesParams {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     pub trashed: Option<bool>,
+    pub workspace_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

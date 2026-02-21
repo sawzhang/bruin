@@ -5,3 +5,4 @@ pub mod sync;
 pub mod tags;
 pub mod templates;
 pub mod webhooks;
+pub mod workspaces;

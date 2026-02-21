@@ -54,6 +54,11 @@ pub fn run() {
             commands::search::search_notes,
             commands::sync::trigger_sync,
             commands::sync::get_sync_status,
+            commands::workspaces::create_workspace,
+            commands::workspaces::list_workspaces,
+            commands::workspaces::delete_workspace,
+            commands::notes::get_knowledge_graph,
+            commands::search::semantic_search,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

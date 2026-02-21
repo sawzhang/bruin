@@ -13,6 +13,7 @@ export interface Note {
   sync_hash: string | null;
   tags: string[];
   state: NoteState;
+  workspace_id: string | null;
 }
 
 export interface NoteListItem {
@@ -25,6 +26,7 @@ export interface NoteListItem {
   word_count: number;
   tags: string[];
   state: NoteState;
+  workspace_id: string | null;
 }
 
 export interface CreateNoteParams {
@@ -47,6 +49,7 @@ export interface ListNotesParams {
   sort_order?: "asc" | "desc";
   limit?: number;
   offset?: number;
+  workspace_id?: string;
 }
 
 export interface SearchNotesParams {

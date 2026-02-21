@@ -102,5 +102,6 @@ pub fn import_file(path: &Path) -> Result<Note, String> {
         sync_hash: None,
         tags,
         state: "draft".to_string(),
+        workspace_id: None,
     })
 }
