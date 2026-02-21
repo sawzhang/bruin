@@ -76,8 +76,8 @@ pub fn get_icloud_status() -> ICloudStatus {
     }
 }
 
-/// Return the iCloud notes directory path.
-pub fn get_icloud_dir() -> Result<PathBuf, String> {
+/// Return the old iCloud notes directory path (com~apple~CloudDocs).
+fn get_legacy_icloud_dir() -> Result<PathBuf, String> {
     let home = std::env::var("HOME")
         .map_err(|_| "HOME environment variable not set".to_string())?;
     Ok(PathBuf::from(home)
@@ -86,6 +86,79 @@ pub fn get_icloud_dir() -> Result<PathBuf, String> {
         .join("com~apple~CloudDocs")
         .join("Bruin")
         .join("notes"))
+}
+
+/// Return the iCloud notes directory path using the shared app container.
+/// This path is accessible from both macOS (desktop) and iOS (mobile).
+///
+/// macOS path: ~/Library/Mobile Documents/iCloud~com~bruin~app/Documents/notes/
+/// iOS path: resolved via FileManager.url(forUbiquityContainerIdentifier:)
+pub fn get_icloud_dir() -> Result<PathBuf, String> {
+    let home = std::env::var("HOME")
+        .map_err(|_| "HOME environment variable not set".to_string())?;
+    let new_dir = PathBuf::from(&home)
+        .join("Library")
+        .join("Mobile Documents")
+        .join("iCloud~com~bruin~app")
+        .join("Documents")
+        .join("notes");
+
+    // If the new container dir exists, use it
+    if new_dir.exists() {
+        return Ok(new_dir);
+    }
+
+    // Check if the legacy directory has files (backward compatibility)
+    let legacy_dir = get_legacy_icloud_dir()?;
+    if legacy_dir.exists() {
+        // Migrate: create the new directory and move files
+        if let Err(e) = migrate_to_new_container(&legacy_dir, &new_dir) {
+            eprintln!("iCloud migration warning: {}", e);
+            // Fall back to legacy path if migration fails
+            return Ok(legacy_dir);
+        }
+        return Ok(new_dir);
+    }
+
+    // Neither exists yet — use the new path (will be created on first write)
+    Ok(new_dir)
+}
+
+/// Migrate notes from the legacy com~apple~CloudDocs path to the new
+/// iCloud~com~bruin~app container path.
+fn migrate_to_new_container(legacy_dir: &Path, new_dir: &Path) -> Result<(), String> {
+    fs::create_dir_all(new_dir)
+        .map_err(|e| format!("Failed to create new iCloud directory: {}", e))?;
+
+    let entries = fs::read_dir(legacy_dir)
+        .map_err(|e| format!("Failed to read legacy directory: {}", e))?;
+
+    let mut migrated = 0;
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+        let path = entry.path();
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+
+        // Skip hidden files
+        if file_name.starts_with('.') {
+            continue;
+        }
+
+        if path.extension().and_then(|e| e.to_str()) == Some("md") {
+            let dest = new_dir.join(file_name);
+            // Copy rather than move, so the legacy location still works if
+            // the user rolls back to an older version
+            fs::copy(&path, &dest)
+                .map_err(|e| format!("Failed to copy {}: {}", file_name, e))?;
+            migrated += 1;
+        }
+    }
+
+    if migrated > 0 {
+        eprintln!("iCloud migration: copied {} notes to new container", migrated);
+    }
+
+    Ok(())
 }
 
 /// Write note as .md file to iCloud directory using frontmatter serialization.

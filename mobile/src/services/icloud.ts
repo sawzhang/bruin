@@ -1,35 +1,63 @@
-import { File, Directory, Paths } from "expo-file-system";
+import { File, Directory } from "expo-file-system";
+import {
+  isICloudSignedIn,
+  getICloudContainerPath,
+} from "../../modules/icloud-container";
+
+const ICLOUD_CONTAINER_ID = "iCloud.com.bruin.app";
+const NOTES_SUBDIR = "notes";
+
+// Cache the container path after first resolution
+let cachedContainerPath: string | null = null;
 
 /**
- * The iCloud notes directory path.
- * On iOS: ~/Library/Mobile Documents/com~apple~CloudDocs/Bruin/notes/
- *
- * We derive this from the app's document directory by navigating up to the
- * system-level iCloud Drive container.
+ * Resolve and cache the iCloud notes directory path.
+ * Returns the path to <container>/Documents/notes/ or null if unavailable.
  */
-const ICLOUD_NOTES_PATH = "../../Library/Mobile Documents/com~apple~CloudDocs/Bruin/notes";
+async function resolveNotesPath(): Promise<string | null> {
+  if (cachedContainerPath) return cachedContainerPath;
+
+  const containerPath = await getICloudContainerPath(ICLOUD_CONTAINER_ID);
+  if (!containerPath) return null;
+
+  cachedContainerPath = containerPath;
+  return cachedContainerPath;
+}
 
 /**
- * Get a Directory instance pointing to the iCloud notes directory.
+ * Get a Directory handle for the iCloud notes directory.
+ * Creates the notes/ subdirectory if it doesn't exist.
  */
-function getICloudNotesDirectory(): Directory {
-  return new Directory(Paths.document, ICLOUD_NOTES_PATH);
+async function getNotesDirectory(): Promise<Directory | null> {
+  const basePath = await resolveNotesPath();
+  if (!basePath) return null;
+
+  const dir = new Directory(basePath, NOTES_SUBDIR);
+  if (!dir.exists) {
+    dir.create({ intermediates: true });
+  }
+  return dir;
 }
 
 /**
  * Get the iCloud notes directory URI string.
+ * Returns empty string if not yet resolved.
  */
 export function getICloudNotesDir(): string {
-  return getICloudNotesDirectory().uri;
+  if (cachedContainerPath) {
+    return cachedContainerPath + "/" + NOTES_SUBDIR;
+  }
+  return "";
 }
 
 /**
- * Check if iCloud notes directory exists and is accessible.
+ * Check if iCloud is available (user signed in + container accessible).
  */
 export async function isICloudAvailable(): Promise<boolean> {
   try {
-    const dir = getICloudNotesDirectory();
-    return dir.exists;
+    if (!isICloudSignedIn()) return false;
+    const dir = await getNotesDirectory();
+    return dir !== null;
   } catch {
     return false;
   }
@@ -40,24 +68,16 @@ export async function isICloudAvailable(): Promise<boolean> {
  * Filters out hidden files and .icloud placeholder files.
  */
 export async function listICloudFiles(): Promise<string[]> {
-  const dir = getICloudNotesDirectory();
-
-  if (!dir.exists) {
-    return [];
-  }
+  const dir = await getNotesDirectory();
+  if (!dir || !dir.exists) return [];
 
   const entries = dir.list();
   const filenames: string[] = [];
 
   for (const entry of entries) {
-    // Only process files (skip directories)
     if (entry instanceof File) {
       const name = entry.name;
-      // Skip hidden files (including .icloud placeholders)
-      if (name.startsWith(".")) {
-        continue;
-      }
-      // Only include .md files
+      if (name.startsWith(".")) continue;
       if (name.endsWith(".md")) {
         filenames.push(name);
       }
@@ -71,24 +91,23 @@ export async function listICloudFiles(): Promise<string[]> {
  * Read the contents of a file in the iCloud notes directory.
  */
 export async function readICloudFile(filename: string): Promise<string> {
-  const file = new File(getICloudNotesDirectory(), filename);
+  const dir = await getNotesDirectory();
+  if (!dir) throw new Error("iCloud not available");
+
+  const file = new File(dir, filename);
   return file.text();
 }
 
 /**
  * Write content to a file in the iCloud notes directory.
- * Creates the directory if it does not exist.
+ * Creates the directory structure if it does not exist.
  */
 export async function writeICloudFile(
   filename: string,
   content: string
 ): Promise<void> {
-  const dir = getICloudNotesDirectory();
-
-  // Ensure directory exists
-  if (!dir.exists) {
-    dir.create({ intermediates: true });
-  }
+  const dir = await getNotesDirectory();
+  if (!dir) throw new Error("iCloud not available");
 
   const file = new File(dir, filename);
   if (!file.exists) {
@@ -101,7 +120,10 @@ export async function writeICloudFile(
  * Delete a file from the iCloud notes directory.
  */
 export async function deleteICloudFile(filename: string): Promise<void> {
-  const file = new File(getICloudNotesDirectory(), filename);
+  const dir = await getNotesDirectory();
+  if (!dir) return;
+
+  const file = new File(dir, filename);
   if (file.exists) {
     file.delete();
   }

@@ -15,12 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.bruin.mobile",
-      "entitlements": {
-        "com.apple.developer.icloud-container-identifiers": [],
-        "com.apple.developer.ubiquity-container-identifiers": [],
-        "com.apple.developer.icloud-services": ["CloudDocuments"]
-      }
+      "bundleIdentifier": "com.bruin.mobile"
     },
     "android": {
       "adaptiveIcon": {
@@ -33,7 +28,8 @@
     "plugins": [
       "expo-router",
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      "./plugins/withICloud"
     ]
   }
 }
