@@ -1,9 +1,28 @@
 import { v4 as uuidv4 } from "uuid";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import db from "./connection.js";
 
 const TAG_REGEX = /#([a-zA-Z0-9_]+(?:\/[a-zA-Z0-9_]+)*)/g;
+
+/// Notify the Tauri app that the MCP server has written to the database.
+/// Writes a timestamp to a trigger file that the Tauri file watcher monitors.
+function notifyTauri(): void {
+  try {
+    const triggerDir = path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "com.bruin.app"
+    );
+    fs.mkdirSync(triggerDir, { recursive: true });
+    const triggerFile = path.join(triggerDir, ".bruin-sync-trigger");
+    fs.writeFileSync(triggerFile, new Date().toISOString());
+  } catch {
+    // Non-fatal: Tauri may not be running
+  }
+}
 
 export interface NoteRow {
   id: string;
@@ -215,6 +234,7 @@ export function createNote(
   syncNoteLinks(id, content);
 
   logActivity("agent", "note_created", id, `Created note '${title}'`);
+  notifyTauri();
 
   return {
     id,
@@ -293,6 +313,7 @@ export function updateNote(
   }
 
   logActivity("agent", "note_updated", id, `Updated note '${newTitle}'`);
+  notifyTauri();
 
   return getNote(id);
 }
@@ -312,12 +333,14 @@ export function deleteNote(
   if (permanent) {
     logActivity("agent", "note_deleted", id, `Permanently deleted note '${id}'`);
     db.prepare("DELETE FROM notes WHERE id = ?").run(id);
+    notifyTauri();
     return { success: true, message: `Note '${id}' permanently deleted` };
   } else {
     db.prepare(
       "UPDATE notes SET is_trashed = 1, updated_at = ? WHERE id = ?"
     ).run(now(), id);
     logActivity("agent", "note_trashed", id, `Moved note '${id}' to trash`);
+    notifyTauri();
     return { success: true, message: `Note '${id}' moved to trash` };
   }
 }
@@ -350,6 +373,7 @@ export function setNoteState(
   ).run(state, now(), id);
 
   logActivity("agent", "state_changed", id, `Changed state '${existing.state}' → '${state}'`);
+  notifyTauri();
 
   return getNote(id);
 }
@@ -489,6 +513,7 @@ export function appendToNote(
   syncNoteTags(noteId, extractTags(newContent));
 
   logActivity("agent", "note_updated", noteId, `Appended to note '${existing.title}'`);
+  notifyTauri();
 
   return getNote(noteId);
 }
@@ -569,6 +594,9 @@ export function importMarkdownFiles(
   });
 
   transaction();
+  if (imported > 0) {
+    notifyTauri();
+  }
   return { imported, skipped };
 }
 
@@ -644,6 +672,7 @@ export function createNoteFromTemplate(
   syncNoteTags(id, allTags);
 
   logActivity("agent", "note_created", id, `Created note '${noteTitle}' from template '${template.name}'`);
+  notifyTauri();
 
   return getNote(id)!;
 }

@@ -1,8 +1,80 @@
 use crate::db::models::Note;
 use crate::markdown::frontmatter;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// Status of iCloud availability.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ICloudStatus {
+    pub available: bool,
+    pub directory: String,
+    pub writable: bool,
+    pub error: Option<String>,
+}
+
+/// Check if the iCloud directory exists and is writable.
+pub fn is_icloud_available() -> bool {
+    match get_icloud_dir() {
+        Ok(dir) => {
+            if !dir.exists() {
+                return false;
+            }
+            // Test write access by creating and removing a temp file
+            let test_file = dir.join(".bruin-write-test");
+            match fs::write(&test_file, "test") {
+                Ok(()) => {
+                    let _ = fs::remove_file(&test_file);
+                    true
+                }
+                Err(_) => false,
+            }
+        }
+        Err(_) => false,
+    }
+}
+
+/// Get detailed iCloud status information.
+pub fn get_icloud_status() -> ICloudStatus {
+    match get_icloud_dir() {
+        Ok(dir) => {
+            let dir_str = dir.to_string_lossy().to_string();
+            if !dir.exists() {
+                return ICloudStatus {
+                    available: false,
+                    directory: dir_str,
+                    writable: false,
+                    error: Some("iCloud directory does not exist".to_string()),
+                };
+            }
+            let test_file = dir.join(".bruin-write-test");
+            match fs::write(&test_file, "test") {
+                Ok(()) => {
+                    let _ = fs::remove_file(&test_file);
+                    ICloudStatus {
+                        available: true,
+                        directory: dir_str,
+                        writable: true,
+                        error: None,
+                    }
+                }
+                Err(e) => ICloudStatus {
+                    available: true,
+                    directory: dir_str,
+                    writable: false,
+                    error: Some(format!("Directory not writable: {}", e)),
+                },
+            }
+        }
+        Err(e) => ICloudStatus {
+            available: false,
+            directory: String::new(),
+            writable: false,
+            error: Some(e),
+        },
+    }
+}
 
 /// Return the iCloud notes directory path.
 pub fn get_icloud_dir() -> Result<PathBuf, String> {
@@ -62,6 +134,11 @@ pub fn list_icloud_files() -> Result<Vec<PathBuf>, String> {
         let entry =
             entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
         let path = entry.path();
+        // Skip hidden files (including .icloud placeholders)
+        let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        if file_name.starts_with('.') {
+            continue;
+        }
         if path.extension().and_then(|e| e.to_str()) == Some("md") {
             files.push(path);
         }

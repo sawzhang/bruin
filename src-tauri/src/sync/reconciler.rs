@@ -12,6 +12,23 @@ pub enum SyncAction {
     Conflict,
 }
 
+/// Result of a full reconciliation run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReconcileResult {
+    pub files_synced: u32,
+    pub imported_note_ids: Vec<String>,
+    pub failures: Vec<FailedSyncOp>,
+}
+
+/// A sync operation that failed and can be retried.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FailedSyncOp {
+    pub note_id: String,
+    pub operation: String,
+    pub error: String,
+    pub retry_count: u32,
+}
+
 /// Compare notes by sync_hash. Return the appropriate SyncAction.
 pub fn reconcile(db_note: Option<&Note>, file_note: &Note) -> SyncAction {
     match db_note {
@@ -34,12 +51,21 @@ pub fn reconcile(db_note: Option<&Note>, file_note: &Note) -> SyncAction {
     }
 }
 
-/// Insert or replace a note from file into the database.
+/// Insert or update a note from file into the database using merge strategy.
+/// On conflict, preserves DB-only fields: state, workspace_id, is_trashed, created_at.
 pub(crate) fn import_note_to_db(conn: &Connection, note: &Note) -> Result<(), String> {
     let hash = icloud::compute_sync_hash(&note.title, &note.content);
 
     conn.execute(
-        "INSERT OR REPLACE INTO notes (id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, sync_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO notes (id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, sync_hash)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT(id) DO UPDATE SET
+           title = excluded.title,
+           content = excluded.content,
+           updated_at = excluded.updated_at,
+           is_pinned = excluded.is_pinned,
+           word_count = excluded.word_count,
+           sync_hash = excluded.sync_hash",
         rusqlite::params![
             note.id,
             note.title,
@@ -55,6 +81,7 @@ pub(crate) fn import_note_to_db(conn: &Connection, note: &Note) -> Result<(), St
     .map_err(|e| e.to_string())?;
 
     crate::commands::notes::sync_tags(conn, &note.id, &note.tags)?;
+    crate::commands::notes::sync_note_links(conn, &note.id, &note.content)?;
 
     Ok(())
 }
@@ -68,7 +95,7 @@ pub(crate) fn fetch_note_by_id(conn: &Connection, id: &str) -> Option<Note> {
 fn fetch_all_notes(conn: &Connection) -> Result<Vec<Note>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash FROM notes WHERE is_trashed = 0",
+            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash, state, workspace_id FROM notes WHERE is_trashed = 0",
         )
         .map_err(|e| e.to_string())?;
 
@@ -86,8 +113,8 @@ fn fetch_all_notes(conn: &Connection) -> Result<Vec<Note>, String> {
                 file_path: row.get(8)?,
                 sync_hash: row.get(9)?,
                 tags: vec![],
-                state: "draft".to_string(),
-                workspace_id: None,
+                state: row.get::<_, String>(10).unwrap_or_else(|_| "draft".to_string()),
+                workspace_id: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -113,15 +140,77 @@ fn update_sync_hash(conn: &Connection, id: &str, hash: &str) -> Result<(), Strin
 }
 
 /// Run full reconciliation between DB and iCloud files.
-/// Returns the number of files synced.
-pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
+/// Accepts optional progress callback and retry queue from previous failures.
+pub fn full_reconcile(
+    conn: &Connection,
+    progress: Option<&dyn Fn(u32, u32, &str)>,
+    retry_queue: Option<Vec<FailedSyncOp>>,
+) -> Result<ReconcileResult, String> {
     let mut files_synced: u32 = 0;
+    let mut imported_note_ids: Vec<String> = Vec::new();
+    let mut failures: Vec<FailedSyncOp> = Vec::new();
+
+    // Retry previously failed operations first
+    if let Some(retries) = retry_queue {
+        for mut op in retries {
+            if op.retry_count >= 3 {
+                failures.push(op);
+                continue;
+            }
+            op.retry_count += 1;
+            match op.operation.as_str() {
+                "import" => {
+                    let icloud_dir = icloud::get_icloud_dir()?;
+                    let file_path = icloud_dir.join(format!("{}.md", op.note_id));
+                    if file_path.exists() {
+                        match icloud::import_file(&file_path) {
+                            Ok(mut file_note) => {
+                                file_note.sync_hash = Some(icloud::compute_sync_hash(&file_note.title, &file_note.content));
+                                if let Err(e) = import_note_to_db(conn, &file_note) {
+                                    op.error = e;
+                                    failures.push(op);
+                                } else {
+                                    imported_note_ids.push(file_note.id);
+                                    files_synced += 1;
+                                }
+                            }
+                            Err(e) => {
+                                op.error = e;
+                                failures.push(op);
+                            }
+                        }
+                    }
+                }
+                "export" => {
+                    if let Some(db_note) = fetch_note_by_id(conn, &op.note_id) {
+                        match icloud::export_note(&db_note) {
+                            Ok(()) => {
+                                let hash = icloud::compute_sync_hash(&db_note.title, &db_note.content);
+                                let _ = update_sync_hash(conn, &db_note.id, &hash);
+                                files_synced += 1;
+                            }
+                            Err(e) => {
+                                op.error = e;
+                                failures.push(op);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 
     let icloud_files = icloud::list_icloud_files()?;
+    let total_files = icloud_files.len() as u32;
     let mut synced_ids: HashSet<String> = HashSet::new();
 
     // Process each iCloud file
-    for file_path in &icloud_files {
+    for (i, file_path) in icloud_files.iter().enumerate() {
+        if let Some(ref cb) = progress {
+            cb(i as u32, total_files, "importing");
+        }
+
         match icloud::import_file(file_path) {
             Ok(mut file_note) => {
                 file_note.sync_hash =
@@ -134,8 +223,19 @@ pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
                 match action {
                     SyncAction::Import => {
                         match import_note_to_db(conn, &file_note) {
-                            Ok(()) => files_synced += 1,
-                            Err(e) => log::warn!("Failed to import note {} from iCloud: {}", file_note.id, e),
+                            Ok(()) => {
+                                imported_note_ids.push(file_note.id.clone());
+                                files_synced += 1;
+                            }
+                            Err(e) => {
+                                log::warn!("Failed to import note {} from iCloud: {}", file_note.id, e);
+                                failures.push(FailedSyncOp {
+                                    note_id: file_note.id.clone(),
+                                    operation: "import".to_string(),
+                                    error: e,
+                                    retry_count: 0,
+                                });
+                            }
                         }
                     }
                     SyncAction::Export => {
@@ -148,7 +248,15 @@ pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
                                     }
                                     files_synced += 1;
                                 }
-                                Err(e) => log::warn!("Failed to export note {} to iCloud: {}", db.id, e),
+                                Err(e) => {
+                                    log::warn!("Failed to export note {} to iCloud: {}", db.id, e);
+                                    failures.push(FailedSyncOp {
+                                        note_id: db.id.clone(),
+                                        operation: "export".to_string(),
+                                        error: e,
+                                        retry_count: 0,
+                                    });
+                                }
                             }
                         }
                     }
@@ -167,8 +275,14 @@ pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
 
     // Export DB notes that don't have corresponding iCloud files
     let all_db_notes = fetch_all_notes(conn)?;
+    let total_export = all_db_notes.len() as u32;
+    let mut export_i: u32 = 0;
+
     for note in &all_db_notes {
         if !synced_ids.contains(&note.id) {
+            if let Some(ref cb) = progress {
+                cb(export_i, total_export, "exporting");
+            }
             match icloud::export_note(note) {
                 Ok(()) => {
                     let hash = icloud::compute_sync_hash(&note.title, &note.content);
@@ -179,11 +293,25 @@ pub fn full_reconcile(conn: &Connection) -> Result<u32, String> {
                 }
                 Err(e) => {
                     log::warn!("Failed to export note {} to iCloud: {}", note.id, e);
-                    // Continue syncing other notes instead of aborting
+                    failures.push(FailedSyncOp {
+                        note_id: note.id.clone(),
+                        operation: "export".to_string(),
+                        error: e,
+                        retry_count: 0,
+                    });
                 }
             }
+            export_i += 1;
         }
     }
 
-    Ok(files_synced)
+    if let Some(ref cb) = progress {
+        cb(0, 0, "idle");
+    }
+
+    Ok(ReconcileResult {
+        files_synced,
+        imported_note_ids,
+        failures,
+    })
 }
