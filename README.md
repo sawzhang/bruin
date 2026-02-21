@@ -21,7 +21,9 @@ Built with Tauri 2 + Rust + React 19.
 
 Grab the latest `.dmg` from [GitHub Releases](https://github.com/sawzhang/bruin/releases/latest) (Apple Silicon & Intel).
 
-> If macOS says "app is damaged", run: `xattr -cr /Applications/Bruin.app`
+> If macOS shows "app is damaged", run: `xattr -cr /Applications/Bruin.app`
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## MCP Server Setup
 
@@ -126,6 +128,26 @@ cd mcp-server && npm test
 | Agent Protocol | MCP SDK (TypeScript) |
 | Embeddings | @huggingface/transformers |
 | Sync | iCloud Drive + notify file watcher |
+
+## Release
+
+Releases are fully automated via GitHub Actions. To publish a new version:
+
+```bash
+# 1. Update version in all three files:
+#    - package.json
+#    - src-tauri/Cargo.toml
+#    - src-tauri/tauri.conf.json
+
+# 2. Update CHANGELOG.md
+
+# 3. Commit, tag, and push
+git add -A && git commit -m "Release v0.2.0"
+git tag v0.2.0
+git push origin master --tags
+```
+
+GitHub Actions will build `.dmg` for Apple Silicon and Intel, then publish the release automatically.
 
 ## License
 

@@ -78,7 +78,23 @@ The MCP server accesses the same database file. Both use WAL mode for concurrent
 
 Notes sync as individual `.md` files with YAML frontmatter to `~/Library/Mobile Documents/com~apple~CloudDocs/Bruin/notes/`. The reconciler compares SHA-256 hashes of `title+content` to detect changes, with `updated_at` as tiebreaker for conflicts.
 
+## Releasing
+
+Version is tracked in three files (keep in sync):
+- `package.json` → `"version"`
+- `src-tauri/Cargo.toml` → `version`
+- `src-tauri/tauri.conf.json` → `"version"`
+
+Update `CHANGELOG.md` with new entries under `## [x.y.z] - YYYY-MM-DD`, following Keep a Changelog format (Added/Changed/Fixed/Removed sections). Add a link reference at the bottom.
+
+Release is fully automated — push a `v*` tag and GitHub Actions builds + publishes:
+
+```bash
+git tag v0.2.0
+git push origin master --tags
+```
+
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`): Runs on push/PR to `master`. Frontend type check + tests, MCP server tests, Rust check + clippy.
-- **Release** (`.github/workflows/release.yml`): Triggered by `v*` tags. Builds Mac `.dmg` for both `aarch64-apple-darwin` and `x86_64-apple-darwin` via `tauri-apps/tauri-action`. Supports Apple code signing via repository secrets.
+- **Release** (`.github/workflows/release.yml`): Triggered by `v*` tags. Builds Mac `.dmg` for both `aarch64-apple-darwin` and `x86_64-apple-darwin` via `tauri-apps/tauri-action`. Auto-publishes (not draft). Supports Apple code signing via repository secrets.
