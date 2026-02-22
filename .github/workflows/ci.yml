@@ -53,14 +53,7 @@ jobs:
         run: cd mcp-server && npx tsc --noEmit
 
       - name: Run tests
-        run: cd mcp-server && npx vitest run --reporter=verbose 2>&1 | tee test-output.txt
-
-      - name: Upload test output
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mcp-test-output
-          path: mcp-server/test-output.txt
+        run: cd mcp-server && npm test
 
   check-rust:
     name: Rust Check
@@ -134,6 +127,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: "-"
         with:
           args: --target ${{ matrix.target }}
 
