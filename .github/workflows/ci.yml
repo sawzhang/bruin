@@ -53,7 +53,16 @@ jobs:
         run: cd mcp-server && npx tsc --noEmit
 
       - name: Run tests
-        run: cd mcp-server && npm test
+        run: |
+          set -o pipefail
+          cd mcp-server && npx vitest run --reporter=verbose 2>&1 | tee test-output.txt
+
+      - name: Upload test output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-test-output
+          path: mcp-server/test-output.txt
 
   check-rust:
     name: Rust Check
