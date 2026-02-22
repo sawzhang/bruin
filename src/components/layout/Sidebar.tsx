@@ -18,6 +18,7 @@ export function Sidebar() {
   const isActivityPanelOpen = useUIStore((s) => s.isActivityPanelOpen);
   const toggleGraphView = useUIStore((s) => s.toggleGraphView);
   const isGraphViewOpen = useUIStore((s) => s.isGraphViewOpen);
+  const toggleSettings = useUIStore((s) => s.toggleSettings);
 
   const [syncStatus, setSyncStatus] = useState<SyncState>({
     is_syncing: false,
@@ -291,6 +292,25 @@ export function Sidebar() {
             >
               <circle cx="7" cy="7" r="2.2" />
               <path d="M7 1.5v1.2M7 11.3v1.2M1.5 7h1.2M11.3 7h1.2M2.8 2.8l.85.85M10.35 10.35l.85.85M11.2 2.8l-.85.85M3.65 10.35l-.85.85" />
+            </svg>
+          </button>
+          <button
+            onClick={toggleSettings}
+            title="Settings (Cmd+,)"
+            className="w-6 h-6 flex items-center justify-center rounded text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5.7 1.5h2.6l.3 1.7.9.4 1.5-.8 1.8 1.8-.8 1.5.4.9 1.7.3v2.6l-1.7.3-.4.9.8 1.5-1.8 1.8-1.5-.8-.9.4-.3 1.7H5.7l-.3-1.7-.9-.4-1.5.8-1.8-1.8.8-1.5-.4-.9-1.7-.3V5.7l1.7-.3.4-.9-.8-1.5L3 1.2l1.5.8.9-.4.3-1.7z" />
+              <circle cx="7" cy="7" r="2" />
             </svg>
           </button>
         </div>

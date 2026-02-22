@@ -1,6 +1,9 @@
 pub mod activity;
+pub mod export;
+pub mod files;
 pub mod notes;
 pub mod search;
+pub mod settings;
 pub mod sync;
 pub mod tags;
 pub mod templates;

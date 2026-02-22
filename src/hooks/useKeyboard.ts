@@ -29,6 +29,20 @@ export function useKeyboard() {
         return;
       }
 
+      // Cmd+K: toggle command palette (alternative)
+      if (meta && e.key === "k") {
+        e.preventDefault();
+        useUIStore.getState().toggleCommandPalette();
+        return;
+      }
+
+      // Cmd+,: toggle settings
+      if (meta && e.key === ",") {
+        e.preventDefault();
+        useUIStore.getState().toggleSettings();
+        return;
+      }
+
       // Cmd+T: toggle theme picker
       if (meta && e.key === "t") {
         e.preventDefault();
@@ -47,6 +61,11 @@ export function useKeyboard() {
       // Escape: close overlays
       if (e.key === "Escape") {
         const ui = useUIStore.getState();
+        if (ui.isSettingsOpen) {
+          e.preventDefault();
+          ui.toggleSettings();
+          return;
+        }
         if (ui.isThemePickerOpen) {
           e.preventDefault();
           ui.toggleThemePicker();

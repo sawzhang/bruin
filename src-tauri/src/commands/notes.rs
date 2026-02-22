@@ -114,9 +114,22 @@ fn fire_webhooks(conn: &Connection, event_type: &str, note_id: Option<&str>, sum
 }
 
 pub(crate) fn sync_tags(conn: &Connection, note_id: &str, tags: &[String]) -> Result<(), String> {
+    // Collect old tag IDs before deleting, so we can update their counts
+    let old_tag_ids: Vec<i64> = {
+        let mut stmt = conn
+            .prepare("SELECT tag_id FROM note_tags WHERE note_id = ?1")
+            .map_err(|e| e.to_string())?;
+        let ids: Vec<i64> = stmt.query_map([note_id], |row| row.get::<_, i64>(0))
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        ids
+    };
+
     conn.execute("DELETE FROM note_tags WHERE note_id = ?1", [note_id])
         .map_err(|e| e.to_string())?;
 
+    let mut new_tag_ids: Vec<i64> = Vec::new();
     for tag_name in tags {
         let parent = get_parent_tag(tag_name);
 
@@ -137,12 +150,26 @@ pub(crate) fn sync_tags(conn: &Connection, note_id: &str, tags: &[String]) -> Re
             rusqlite::params![note_id, tag_id],
         )
         .map_err(|e| e.to_string())?;
+
+        new_tag_ids.push(tag_id);
     }
 
-    conn.execute_batch(
-        "UPDATE tags SET note_count = (SELECT COUNT(*) FROM note_tags WHERE note_tags.tag_id = tags.id)",
-    )
-    .map_err(|e| e.to_string())?;
+    // Only update counts for affected tags (old + new)
+    let mut affected_ids: Vec<i64> = old_tag_ids;
+    affected_ids.extend(new_tag_ids);
+    affected_ids.sort();
+    affected_ids.dedup();
+
+    if !affected_ids.is_empty() {
+        let placeholders: Vec<String> = (1..=affected_ids.len()).map(|i| format!("?{}", i)).collect();
+        let sql = format!(
+            "UPDATE tags SET note_count = (SELECT COUNT(*) FROM note_tags WHERE note_tags.tag_id = tags.id) WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+        let params: Vec<&dyn rusqlite::types::ToSql> = affected_ids.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+        stmt.execute(params.as_slice()).map_err(|e| e.to_string())?;
+    }
 
     Ok(())
 }
@@ -159,6 +186,35 @@ pub(crate) fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<St
         .collect();
 
     Ok(tags)
+}
+
+/// Batch-fetch tags for multiple notes in a single query (fixes N+1).
+pub(crate) fn batch_fetch_tags(conn: &Connection, note_ids: &[String]) -> Result<std::collections::HashMap<String, Vec<String>>, String> {
+    use std::collections::HashMap;
+
+    let mut map: HashMap<String, Vec<String>> = HashMap::new();
+    if note_ids.is_empty() {
+        return Ok(map);
+    }
+
+    let placeholders: Vec<String> = (1..=note_ids.len()).map(|i| format!("?{}", i)).collect();
+    let sql = format!(
+        "SELECT nt.note_id, t.name FROM tags t JOIN note_tags nt ON t.id = nt.tag_id WHERE nt.note_id IN ({}) ORDER BY t.name",
+        placeholders.join(", ")
+    );
+
+    let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
+    let params: Vec<&dyn rusqlite::types::ToSql> = note_ids.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+    let rows = stmt.query_map(params.as_slice(), |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    }).map_err(|e| e.to_string())?;
+
+    for row in rows {
+        let (note_id, tag_name) = row.map_err(|e| e.to_string())?;
+        map.entry(note_id).or_default().push(tag_name);
+    }
+
+    Ok(map)
 }
 
 pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
@@ -353,8 +409,7 @@ pub fn list_notes(
             .map_err(|e| e.to_string())?;
 
         for row in rows {
-            let mut item = row.map_err(|e| e.to_string())?;
-            item.tags = fetch_note_tags(&conn, &item.id)?;
+            let item = row.map_err(|e| e.to_string())?;
             items.push(item);
         }
     } else {
@@ -397,9 +452,17 @@ pub fn list_notes(
             .map_err(|e| e.to_string())?;
 
         for row in rows {
-            let mut item = row.map_err(|e| e.to_string())?;
-            item.tags = fetch_note_tags(&conn, &item.id)?;
+            let item = row.map_err(|e| e.to_string())?;
             items.push(item);
+        }
+    }
+
+    // Batch-fetch tags for all notes (fixes N+1)
+    let note_ids: Vec<String> = items.iter().map(|n| n.id.clone()).collect();
+    let tags_map = batch_fetch_tags(&conn, &note_ids)?;
+    for item in &mut items {
+        if let Some(tags) = tags_map.get(&item.id) {
+            item.tags = tags.clone();
         }
     }
 

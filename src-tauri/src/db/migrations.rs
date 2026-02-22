@@ -211,6 +211,17 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
         ",
     )?;
 
+    // Phase 9: Settings
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        ",
+    )?;
+
     // Seed default templates if table is empty
     let template_count: i64 = conn
         .prepare("SELECT COUNT(*) FROM templates")?

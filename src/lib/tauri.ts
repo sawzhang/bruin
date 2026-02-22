@@ -167,3 +167,36 @@ export async function importMarkdownFiles(
 ): Promise<{ imported: number; skipped: number }> {
   return invoke("import_markdown_files", { paths });
 }
+
+// Settings commands
+export async function getSetting(key: string): Promise<string | null> {
+  return invoke("get_setting", { key });
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+  return invoke("set_setting", { key, value });
+}
+
+export async function getAllSettings(): Promise<Record<string, string>> {
+  return invoke("get_all_settings");
+}
+
+// Export commands
+export async function exportNoteMarkdown(
+  id: string,
+  stripFrontmatter?: boolean,
+): Promise<string> {
+  return invoke("export_note_markdown", { id, stripFrontmatter: stripFrontmatter ?? false });
+}
+
+export async function exportNoteHtml(id: string): Promise<string> {
+  return invoke("export_note_html", { id });
+}
+
+// Image commands
+export async function saveImage(
+  data: number[],
+  filename: string,
+): Promise<string> {
+  return invoke("save_image", { data, filename });
+}

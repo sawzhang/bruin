@@ -1,0 +1,36 @@
+/* Table styles */
+.tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  overflow: hidden;
+}
+
+.tiptap table td,
+.tiptap table th {
+  border: 1px solid var(--bear-border);
+  padding: 0.5rem 0.75rem;
+  position: relative;
+  vertical-align: top;
+  min-width: 80px;
+}
+
+.tiptap table th {
+  background-color: var(--bear-hover);
+  font-weight: 600;
+}
+
+.tiptap table .selectedCell {
+  background-color: var(--bear-active);
+}
+
+.tiptap table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--bear-accent);
+  cursor: col-resize;
+  z-index: 10;
+}

@@ -89,6 +89,12 @@ pub fn run() {
             commands::workspaces::delete_workspace,
             commands::notes::get_knowledge_graph,
             commands::search::semantic_search,
+            commands::settings::get_setting,
+            commands::settings::set_setting,
+            commands::settings::get_all_settings,
+            commands::export::export_note_markdown,
+            commands::export::export_note_html,
+            commands::files::save_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

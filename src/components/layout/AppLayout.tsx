@@ -3,6 +3,7 @@ import { useUIStore } from "../../stores/uiStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTagStore } from "../../stores/tagStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useKeyboard } from "../../hooks/useKeyboard";
 import { Sidebar } from "./Sidebar";
 import { NoteList } from "./NoteList";
@@ -10,9 +11,12 @@ import { EditorPanel } from "./EditorPanel";
 import { Resizer } from "../common/Resizer";
 import { CommandPalette } from "../search/CommandPalette";
 import { ThemePicker } from "../settings/ThemePicker";
+import { SettingsPanel } from "../settings/SettingsPanel";
 import { ActivityPanel } from "../activity/ActivityPanel";
 import { TemplatePicker } from "../templates/TemplatePicker";
 import { KnowledgeGraphView } from "../graph/KnowledgeGraphView";
+import { ToastContainer } from "../ui/Toast";
+import { ErrorBoundary } from "../ui/ErrorBoundary";
 
 export function AppLayout() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -25,6 +29,7 @@ export function AppLayout() {
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadTags = useTagStore((s) => s.loadTags);
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
 
   useKeyboard();
 
@@ -33,13 +38,16 @@ export function AppLayout() {
     loadNotes();
     loadTags();
     loadWorkspaces();
-  }, [loadNotes, loadTags, loadWorkspaces]);
+    loadSettings();
+  }, [loadNotes, loadTags, loadWorkspaces, loadSettings]);
 
   return (
     <div className={`theme-${theme} h-full flex overflow-hidden bg-bear-bg text-bear-text`}>
       {/* Sidebar */}
       <div style={{ width: sidebarWidth }} className="shrink-0 h-full">
-        <Sidebar />
+        <ErrorBoundary fallbackMessage="Sidebar error">
+          <Sidebar />
+        </ErrorBoundary>
       </div>
 
       <Resizer onResize={(d) => setSidebarWidth(sidebarWidth + d)} />
@@ -53,14 +61,18 @@ export function AppLayout() {
         <>
           {/* Note List */}
           <div style={{ width: noteListWidth }} className="shrink-0 h-full">
-            <NoteList />
+            <ErrorBoundary fallbackMessage="Note list error">
+              <NoteList />
+            </ErrorBoundary>
           </div>
 
           <Resizer onResize={(d) => setNoteListWidth(noteListWidth + d)} />
 
           {/* Editor */}
           <div className="flex-1 h-full min-w-0">
-            <EditorPanel />
+            <ErrorBoundary fallbackMessage="Editor error">
+              <EditorPanel />
+            </ErrorBoundary>
           </div>
         </>
       )}
@@ -76,6 +88,8 @@ export function AppLayout() {
       <CommandPalette />
       <ThemePicker />
       <TemplatePicker />
+      <SettingsPanel />
+      <ToastContainer />
     </div>
   );
 }

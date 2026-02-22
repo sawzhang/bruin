@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { KnowledgeGraph } from "../types/graph";
 import * as tauri from "../lib/tauri";
+import { useToastStore } from "./toastStore";
 
 interface GraphState {
   graph: KnowledgeGraph | null;
@@ -20,8 +21,9 @@ export const useGraphStore = create<GraphState>((set) => ({
     try {
       const graph = await tauri.getKnowledgeGraph(centerNoteId, depth, maxNodes);
       set({ graph, isLoading: false });
-    } catch {
+    } catch (err) {
       set({ isLoading: false });
+      useToastStore.getState().addToast({ type: "error", message: `Failed to load graph: ${err}` });
     }
   },
 

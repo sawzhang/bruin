@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Workspace } from "../types/workspace";
 import * as tauri from "../lib/tauri";
+import { useToastStore } from "./toastStore";
 
 interface WorkspaceState {
   workspaces: Workspace[];
@@ -19,8 +20,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       const workspaces = await tauri.listWorkspaces();
       set({ workspaces });
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to load workspaces: ${err}` });
     }
   },
 
@@ -32,8 +33,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     try {
       await tauri.createWorkspace(name, description);
       await get().loadWorkspaces();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to create workspace: ${err}` });
     }
   },
 
@@ -44,8 +45,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         set({ currentWorkspaceId: null });
       }
       await get().loadWorkspaces();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to delete workspace: ${err}` });
     }
   },
 }));

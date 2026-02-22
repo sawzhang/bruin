@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { ActivityEvent } from "../types/activity";
 import * as tauri from "../lib/tauri";
+import { useToastStore } from "./toastStore";
 
 interface ActivityState {
   events: ActivityEvent[];
@@ -17,8 +18,9 @@ export const useActivityStore = create<ActivityState>((set) => ({
     try {
       const events = await tauri.getActivityFeed(50, noteId);
       set({ events, isLoading: false });
-    } catch {
+    } catch (err) {
       set({ isLoading: false });
+      useToastStore.getState().addToast({ type: "error", message: `Failed to load activity: ${err}` });
     }
   },
 }));

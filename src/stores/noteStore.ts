@@ -8,6 +8,7 @@ import type {
 } from "../types/note";
 import * as tauri from "../lib/tauri";
 import { useTagStore } from "./tagStore";
+import { useToastStore } from "./toastStore";
 
 interface NoteStoreState {
   notes: NoteListItem[];
@@ -45,8 +46,9 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
         },
       );
       set({ notes, isLoading: false });
-    } catch {
+    } catch (err) {
       set({ isLoading: false });
+      useToastStore.getState().addToast({ type: "error", message: `Failed to load notes: ${err}` });
     }
   },
 
@@ -55,8 +57,9 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
     try {
       const note = await tauri.getNote(id);
       set({ currentNote: note });
-    } catch {
+    } catch (err) {
       set({ currentNote: null });
+      useToastStore.getState().addToast({ type: "error", message: `Failed to load note: ${err}` });
     }
   },
 
@@ -69,8 +72,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
       });
       set({ selectedNoteId: note.id, currentNote: note });
       await get().loadNotes();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to create note: ${err}` });
     }
   },
 
@@ -95,8 +98,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
       set({ notes });
       // Refresh tags in sidebar
       useTagStore.getState().loadTags();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to save note: ${err}` });
     }
   },
 
@@ -108,8 +111,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
         set({ selectedNoteId: null, currentNote: null });
       }
       await get().loadNotes();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to delete note: ${err}` });
     }
   },
 
@@ -122,8 +125,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
         set({ currentNote: { ...note, is_pinned: !isPinned } });
       }
       await get().loadNotes();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to pin note: ${err}` });
     }
   },
 
@@ -135,8 +138,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
         set({ selectedNoteId: null, currentNote: null });
       }
       await get().loadNotes();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to trash note: ${err}` });
     }
   },
 
@@ -144,8 +147,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
     try {
       await tauri.restoreNote(id);
       await get().loadNotes();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to restore note: ${err}` });
     }
   },
 
@@ -157,8 +160,8 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
         n.id === note.id ? { ...n, state: note.state } : n,
       );
       set({ notes });
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to change state: ${err}` });
     }
   },
 

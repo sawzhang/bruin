@@ -1,22 +1,9 @@
+use crate::commands::notes::{batch_fetch_tags, fetch_note_tags};
 use crate::db::models::*;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::State;
-
-fn fetch_note_tags(conn: &Connection, note_id: &str) -> Result<Vec<String>, String> {
-    let mut stmt = conn
-        .prepare("SELECT t.name FROM tags t JOIN note_tags nt ON t.id = nt.tag_id WHERE nt.note_id = ?1 ORDER BY t.name")
-        .map_err(|e| e.to_string())?;
-
-    let tags = stmt
-        .query_map([note_id], |row| row.get::<_, String>(0))
-        .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
-
-    Ok(tags)
-}
 
 #[tauri::command]
 pub fn search_notes(
@@ -57,9 +44,17 @@ pub fn search_notes(
 
     let mut items: Vec<NoteListItem> = Vec::new();
     for row in rows {
-        let mut item = row.map_err(|e| e.to_string())?;
-        item.tags = fetch_note_tags(&conn, &item.id)?;
+        let item = row.map_err(|e| e.to_string())?;
         items.push(item);
+    }
+
+    // Batch-fetch tags (fixes N+1)
+    let note_ids: Vec<String> = items.iter().map(|n| n.id.clone()).collect();
+    let tags_map = batch_fetch_tags(&conn, &note_ids)?;
+    for item in &mut items {
+        if let Some(tags) = tags_map.get(&item.id) {
+            item.tags = tags.clone();
+        }
     }
 
     Ok(items)

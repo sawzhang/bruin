@@ -19,6 +19,7 @@ interface UIState {
   isActivityPanelOpen: boolean;
   isTemplatePickerOpen: boolean;
   isGraphViewOpen: boolean;
+  isSettingsOpen: boolean;
   theme: string;
   setSidebarWidth: (w: number) => void;
   setNoteListWidth: (w: number) => void;
@@ -27,6 +28,7 @@ interface UIState {
   toggleActivityPanel: () => void;
   toggleTemplatePicker: () => void;
   toggleGraphView: () => void;
+  toggleSettings: () => void;
   setTheme: (id: string) => void;
 }
 
@@ -38,6 +40,7 @@ export const useUIStore = create<UIState>((set) => ({
   isActivityPanelOpen: false,
   isTemplatePickerOpen: false,
   isGraphViewOpen: false,
+  isSettingsOpen: false,
   theme: loadSavedTheme(),
 
   setSidebarWidth: (w: number) => set({ sidebarWidth: Math.max(160, Math.min(400, w)) }),
@@ -52,6 +55,8 @@ export const useUIStore = create<UIState>((set) => ({
     set((state) => ({ isTemplatePickerOpen: !state.isTemplatePickerOpen })),
   toggleGraphView: () =>
     set((state) => ({ isGraphViewOpen: !state.isGraphViewOpen })),
+  toggleSettings: () =>
+    set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
   setTheme: (id: string) => {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, id);

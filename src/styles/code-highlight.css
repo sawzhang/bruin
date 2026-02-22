@@ -1,0 +1,40 @@
+/* Syntax highlighting theme using bear CSS variables */
+.tiptap pre code .hljs-keyword,
+.tiptap pre code .hljs-selector-tag,
+.tiptap pre code .hljs-built_in { color: var(--bear-accent); }
+
+.tiptap pre code .hljs-string,
+.tiptap pre code .hljs-attr,
+.tiptap pre code .hljs-template-tag,
+.tiptap pre code .hljs-template-variable { color: #98c379; }
+
+.tiptap pre code .hljs-comment,
+.tiptap pre code .hljs-doctag { color: var(--bear-text-muted); font-style: italic; }
+
+.tiptap pre code .hljs-function,
+.tiptap pre code .hljs-title { color: var(--bear-link); }
+
+.tiptap pre code .hljs-number,
+.tiptap pre code .hljs-literal { color: #d19a66; }
+
+.tiptap pre code .hljs-variable,
+.tiptap pre code .hljs-params { color: var(--bear-text); }
+
+.tiptap pre code .hljs-type,
+.tiptap pre code .hljs-class .hljs-title { color: #e5c07b; }
+
+.tiptap pre code .hljs-meta,
+.tiptap pre code .hljs-regexp { color: var(--bear-tag); }
+
+.tiptap pre code .hljs-symbol,
+.tiptap pre code .hljs-bullet { color: #61aeee; }
+
+.tiptap pre code .hljs-operator { color: var(--bear-text-secondary); }
+
+.tiptap pre code .hljs-deletion { color: #e06c75; }
+.tiptap pre code .hljs-addition { color: #98c379; }
+
+.tiptap pre code { color: var(--bear-text); }
+
+/* Code block language selector */
+.tiptap pre { position: relative; }

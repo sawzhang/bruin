@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { Tag, TagTreeNode } from "../types/tag";
 import * as tauri from "../lib/tauri";
+import { useToastStore } from "./toastStore";
 
 interface TagState {
   tags: Tag[];
@@ -50,8 +51,8 @@ export const useTagStore = create<TagState>((set, get) => ({
       const tags = await tauri.listTags();
       set({ tags });
       get().buildTagTree();
-    } catch {
-      // ignore
+    } catch (err) {
+      useToastStore.getState().addToast({ type: "error", message: `Failed to load tags: ${err}` });
     }
   },
 
