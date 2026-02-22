@@ -669,12 +669,10 @@ pub fn get_knowledge_graph(
         let rows = stmt
             .query_map([], |row| row.get::<_, String>(0))
             .map_err(|e| e.to_string())?;
-        for row in rows {
-            if let Ok(id) = row {
-                if visited.len() < max {
-                    visited.insert(id.clone());
-                    queue.push_back((id, 0));
-                }
+        for id in rows.flatten() {
+            if visited.len() < max {
+                visited.insert(id.clone());
+                queue.push_back((id, 0));
             }
         }
     }

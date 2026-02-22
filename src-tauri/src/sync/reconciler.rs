@@ -4,6 +4,9 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// Progress callback: (current, total, message).
+type ProgressFn<'a> = Option<&'a dyn Fn(u32, u32, &str)>;
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SyncAction {
     Import,
@@ -143,7 +146,7 @@ fn update_sync_hash(conn: &Connection, id: &str, hash: &str) -> Result<(), Strin
 /// Accepts optional progress callback and retry queue from previous failures.
 pub fn full_reconcile(
     conn: &Connection,
-    progress: Option<&dyn Fn(u32, u32, &str)>,
+    progress: ProgressFn<'_>,
     retry_queue: Option<Vec<FailedSyncOp>>,
 ) -> Result<ReconcileResult, String> {
     let mut files_synced: u32 = 0;

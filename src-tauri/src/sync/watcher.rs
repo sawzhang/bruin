@@ -39,7 +39,7 @@ impl WatcherState {
 }
 
 /// Check if a path is an iCloud placeholder file (e.g., ".abc123.md.icloud").
-fn is_icloud_placeholder(path: &PathBuf) -> bool {
+fn is_icloud_placeholder(path: &std::path::Path) -> bool {
     let file_name = match path.file_name().and_then(|n| n.to_str()) {
         Some(n) => n,
         None => return false,
