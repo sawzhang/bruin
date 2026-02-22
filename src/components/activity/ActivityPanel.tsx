@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useActivityStore } from "../../stores/activityStore";
 
@@ -14,15 +14,22 @@ const EVENT_ICONS: Record<string, string> = {
 
 export function ActivityPanel() {
   const { events, isLoading, loadEvents } = useActivityStore();
+  const [agentFilter, setAgentFilter] = useState<string>("");
 
   useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+    loadEvents(undefined, agentFilter || undefined);
+  }, [loadEvents, agentFilter]);
 
   return (
     <div className="h-full flex flex-col bg-bear-list">
       <div className="px-3 pt-3 pb-2 border-b border-bear-border">
         <h2 className="text-[13px] font-medium text-bear-text">Activity</h2>
+        <input
+          value={agentFilter}
+          onChange={(e) => setAgentFilter(e.target.value)}
+          placeholder="Filter by agent..."
+          className="mt-1 w-full bg-bear-bg border border-bear-border rounded px-2 py-0.5 text-[11px] text-bear-text outline-none placeholder:text-bear-text-muted"
+        />
       </div>
       <div className="flex-1 overflow-y-auto">
         {isLoading && (
@@ -57,6 +64,11 @@ export function ActivityPanel() {
               <span className="text-[10px] px-1 rounded bg-bear-tag-bg text-bear-tag">
                 {event.actor}
               </span>
+              {event.agent_id && (
+                <span className="text-[10px] px-1 rounded bg-bear-accent/20 text-bear-accent">
+                  agent
+                </span>
+              )}
             </div>
           </div>
         ))}

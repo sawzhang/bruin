@@ -14,6 +14,7 @@ export interface Note {
   tags: string[];
   state: NoteState;
   workspace_id: string | null;
+  version: number;
 }
 
 export interface NoteListItem {

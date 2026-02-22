@@ -1,6 +1,7 @@
 import { useUIStore } from "../../stores/uiStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
+import { AgentListPanel } from "../agents/AgentListPanel";
 
 const FONT_OPTIONS = [
   { label: "System Default", value: "system-ui" },
@@ -115,6 +116,30 @@ export function SettingsPanel() {
                 />
               </SettingRow>
             </div>
+          </section>
+
+          {/* Agents */}
+          <section>
+            <h3 className="text-[12px] uppercase tracking-wider text-bear-text-muted font-medium mb-3">
+              Agents
+            </h3>
+            <AgentListPanel />
+          </section>
+
+          {/* Webhooks */}
+          <section>
+            <h3 className="text-[12px] uppercase tracking-wider text-bear-text-muted font-medium mb-3">
+              Integrations
+            </h3>
+            <button
+              onClick={() => {
+                toggleSettings();
+                useUIStore.getState().toggleWebhookManager();
+              }}
+              className="text-[13px] text-bear-accent hover:underline"
+            >
+              Manage Webhooks
+            </button>
           </section>
 
           {/* Defaults */}

@@ -6,4 +6,5 @@ export interface ActivityEvent {
   timestamp: string;
   summary: string;
   data: string;
+  agent_id: string | null;
 }

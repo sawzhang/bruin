@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod agents;
 pub mod export;
 pub mod files;
 pub mod notes;
@@ -6,6 +7,8 @@ pub mod search;
 pub mod settings;
 pub mod sync;
 pub mod tags;
+pub mod tasks;
 pub mod templates;
 pub mod webhooks;
+pub mod workflows;
 pub mod workspaces;

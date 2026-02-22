@@ -19,6 +19,10 @@ export function Sidebar() {
   const toggleGraphView = useUIStore((s) => s.toggleGraphView);
   const isGraphViewOpen = useUIStore((s) => s.isGraphViewOpen);
   const toggleSettings = useUIStore((s) => s.toggleSettings);
+  const toggleTaskPanel = useUIStore((s) => s.toggleTaskPanel);
+  const isTaskPanelOpen = useUIStore((s) => s.isTaskPanelOpen);
+  const toggleAgentDashboard = useUIStore((s) => s.toggleAgentDashboard);
+  const isAgentDashboardOpen = useUIStore((s) => s.isAgentDashboardOpen);
 
   const [syncStatus, setSyncStatus] = useState<SyncState>({
     is_syncing: false,
@@ -228,6 +232,51 @@ export function Sidebar() {
             <line x1="8.5" y1="5.2" x2="7" y2="8.5" />
           </svg>
           Knowledge Graph
+        </button>
+        <button
+          onClick={toggleTaskPanel}
+          className={clsx(
+            "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
+            isTaskPanelOpen
+              ? "bg-bear-active text-bear-text"
+              : "text-bear-text-secondary hover:bg-bear-hover hover:text-bear-text",
+          )}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+          >
+            <rect x="2" y="2" width="10" height="3" rx="1" />
+            <rect x="2" y="6.5" width="10" height="3" rx="1" />
+            <line x1="4" y1="11.5" x2="10" y2="11.5" />
+          </svg>
+          Tasks
+        </button>
+        <button
+          onClick={toggleAgentDashboard}
+          className={clsx(
+            "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
+            isAgentDashboardOpen
+              ? "bg-bear-active text-bear-text"
+              : "text-bear-text-secondary hover:bg-bear-hover hover:text-bear-text",
+          )}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.3"
+          >
+            <circle cx="7" cy="4.5" r="2.5" />
+            <path d="M2.5 12c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4" />
+          </svg>
+          Agents
         </button>
       </div>
 

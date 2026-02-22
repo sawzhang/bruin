@@ -15,6 +15,7 @@ pub struct Note {
     pub tags: Vec<String>,
     pub state: String,
     pub workspace_id: Option<String>,
+    pub version: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,6 +73,85 @@ pub struct ActivityEvent {
     pub timestamp: String,
     pub summary: String,
     pub data: String,
+    pub agent_id: Option<String>,
+}
+
+// --- Agents ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Agent {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub capabilities: Vec<String>,
+    pub is_active: bool,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// --- Tasks ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Task {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub status: String,
+    pub priority: String,
+    pub due_date: Option<String>,
+    pub assigned_agent_id: Option<String>,
+    pub linked_note_id: Option<String>,
+    pub workspace_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// --- Workflow Templates ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowTemplate {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub steps: Vec<WorkflowStep>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowStep {
+    pub order: i32,
+    pub tool_name: String,
+    pub description: String,
+    pub params: serde_json::Value,
+    pub use_result_as: Option<String>,
+}
+
+// --- Webhook Logs ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebhookLog {
+    pub id: i64,
+    pub webhook_id: String,
+    pub event_type: String,
+    pub payload: String,
+    pub status_code: Option<i32>,
+    pub response_body: Option<String>,
+    pub attempt: i32,
+    pub success: bool,
+    pub error_message: Option<String>,
+    pub timestamp: String,
+}
+
+// --- Agent Workspaces ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentWorkspace {
+    pub agent_id: String,
+    pub workspace_id: String,
+    pub role: String,
+    pub created_at: String,
 }
 
 // --- Workspaces ---
@@ -121,6 +201,7 @@ pub struct UpdateNoteParams {
     pub id: String,
     pub title: Option<String>,
     pub content: Option<String>,
+    pub expected_version: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

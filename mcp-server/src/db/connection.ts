@@ -209,6 +209,138 @@ function ensureDatabase(): Database.Database {
     db.exec("ALTER TABLE notes ADD COLUMN state TEXT NOT NULL DEFAULT 'draft';");
   }
 
+  // Phase 10: Agents + Agent audit tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      capabilities TEXT NOT NULL DEFAULT '[]',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  const hasAgentIdCol = db.prepare(
+    "SELECT COUNT(*) as cnt FROM pragma_table_info('activity_events') WHERE name='agent_id'"
+  ).get() as { cnt: number };
+  if (hasAgentIdCol.cnt === 0) {
+    db.exec("ALTER TABLE activity_events ADD COLUMN agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL;");
+  }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_activity_agent ON activity_events(agent_id);");
+
+  // Phase 11: Tasks
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'todo',
+      priority TEXT NOT NULL DEFAULT 'medium',
+      due_date TEXT,
+      assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+      linked_note_id TEXT REFERENCES notes(id) ON DELETE SET NULL,
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(assigned_agent_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id);
+  `);
+
+  // Phase 12: Workflow Templates
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS workflow_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'general',
+      steps TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  // Phase 13: Webhook Logs
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      webhook_id TEXT NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      status_code INTEGER,
+      response_body TEXT,
+      attempt INTEGER NOT NULL DEFAULT 1,
+      success INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT,
+      timestamp TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_webhook_logs_webhook ON webhook_logs(webhook_id, timestamp DESC);
+  `);
+
+  // Phase 14: Agent Workspaces + Note versioning
+  const hasVersionCol = db.prepare(
+    "SELECT COUNT(*) as cnt FROM pragma_table_info('notes') WHERE name='version'"
+  ).get() as { cnt: number };
+  if (hasVersionCol.cnt === 0) {
+    db.exec("ALTER TABLE notes ADD COLUMN version INTEGER NOT NULL DEFAULT 1;");
+  }
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agent_workspaces (
+      agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (agent_id, workspace_id)
+    );
+  `);
+
+  // Seed default workflows if empty
+  const workflowCount = db.prepare("SELECT COUNT(*) as cnt FROM workflow_templates").get() as { cnt: number };
+  if (workflowCount.cnt === 0) {
+    const ts = new Date().toISOString();
+    db.prepare(
+      "INSERT INTO workflow_templates (id, name, description, category, steps, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      crypto.randomUUID(), "Daily Standup",
+      "Get daily note, list in-progress tasks, and append a summary",
+      "daily",
+      JSON.stringify([
+        { order: 1, tool_name: "get_daily_note", description: "Get or create today's daily note", params: {}, use_result_as: "standup_note" },
+        { order: 2, tool_name: "list_tasks", description: "List all in-progress tasks", params: { status: "in_progress" }, use_result_as: "active_tasks" },
+        { order: 3, tool_name: "append_to_note", description: "Append task summary to daily note", params: { note_id: "{{standup_note.id}}", content: "Active Tasks: {{active_tasks}}" }, use_result_as: "updated_note" },
+      ]),
+      ts, ts
+    );
+    db.prepare(
+      "INSERT INTO workflow_templates (id, name, description, category, steps, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      crypto.randomUUID(), "Research Summary",
+      "Search notes by tag and create a summary note with links",
+      "research",
+      JSON.stringify([
+        { order: 1, tool_name: "list_notes", description: "Find notes with research tag", params: { tag: "research" }, use_result_as: "research_notes" },
+        { order: 2, tool_name: "create_note", description: "Create summary note with links", params: { title: "Research Summary {{date}}", content: "Research Notes: {{research_notes}}" }, use_result_as: "summary_note" },
+      ]),
+      ts, ts
+    );
+    db.prepare(
+      "INSERT INTO workflow_templates (id, name, description, category, steps, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      crypto.randomUUID(), "Meeting Follow-up",
+      "Create a note from meeting template and generate tasks from action items",
+      "project",
+      JSON.stringify([
+        { order: 1, tool_name: "create_from_template", description: "Create meeting note from template", params: { template_name: "Meeting Notes" }, use_result_as: "meeting_note" },
+        { order: 2, tool_name: "create_task", description: "Create follow-up task", params: { title: "Review meeting action items", linked_note_id: "{{meeting_note.id}}" }, use_result_as: "followup_task" },
+      ]),
+      ts, ts
+    );
+  }
+
   return db;
 }
 

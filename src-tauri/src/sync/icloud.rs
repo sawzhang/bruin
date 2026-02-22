@@ -253,5 +253,6 @@ pub fn import_file(path: &Path) -> Result<Note, String> {
         tags,
         state: "draft".to_string(),
         workspace_id: None,
+        version: 1,
     })
 }

@@ -77,6 +77,9 @@ pub fn run() {
             commands::webhooks::register_webhook,
             commands::webhooks::list_webhooks,
             commands::webhooks::delete_webhook,
+            commands::webhooks::update_webhook,
+            commands::webhooks::test_webhook,
+            commands::webhooks::get_webhook_logs,
             commands::tags::list_tags,
             commands::tags::get_notes_by_tag,
             commands::search::search_notes,
@@ -95,6 +98,29 @@ pub fn run() {
             commands::export::export_note_markdown,
             commands::export::export_note_html,
             commands::files::save_image,
+            // Agent commands
+            commands::agents::register_agent,
+            commands::agents::list_agents,
+            commands::agents::get_agent,
+            commands::agents::update_agent,
+            commands::agents::deactivate_agent,
+            commands::agents::get_agent_audit_log,
+            commands::agents::bind_agent_workspace,
+            commands::agents::unbind_agent_workspace,
+            commands::agents::get_agent_workspaces,
+            commands::agents::get_workspace_agents,
+            // Task commands
+            commands::tasks::create_task,
+            commands::tasks::list_tasks,
+            commands::tasks::get_task,
+            commands::tasks::update_task,
+            commands::tasks::complete_task,
+            commands::tasks::delete_task,
+            // Workflow commands
+            commands::workflows::list_workflow_templates,
+            commands::workflows::get_workflow_template,
+            commands::workflows::create_workflow_template,
+            commands::workflows::delete_workflow_template,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

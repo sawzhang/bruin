@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings } from "./db/queries.js";
+import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces } from "./db/queries.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -513,6 +513,289 @@ export function createServer(): McpServer {
       const existingIds = new Set(existing.map((e) => e.note_id));
       const needsEmbedding = allNotes.filter((n) => !existingIds.has(n.id));
       return text({ total_notes: allNotes.length, indexed: existing.length, needs_indexing: needsEmbedding.length, note_ids: needsEmbedding.map((n) => n.id) });
+    }
+  );
+
+  // --- Agent Registry Tools ---
+
+  server.tool(
+    "register_agent",
+    "Register a new AI agent identity. Agents get first-class tracking in the activity feed and can be assigned to tasks and workspaces.",
+    {
+      name: z.string().describe("Unique agent name (e.g. 'research-assistant', 'daily-reporter')"),
+      description: z.string().optional().describe("Description of what the agent does"),
+      capabilities: z.array(z.string()).optional().describe("List of capabilities (e.g. ['note_creation', 'search', 'task_management'])"),
+    },
+    async (args) => {
+      try {
+        const agent = registerAgent(args.name, args.description, args.capabilities);
+        return text(agent);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  server.tool(
+    "list_agents",
+    "List all registered AI agents",
+    {},
+    async () => {
+      const agents = listAgents();
+      return text(agents);
+    }
+  );
+
+  server.tool(
+    "get_agent_audit_log",
+    "Get the activity audit log for a specific agent — all actions performed by this agent",
+    {
+      agent_id: z.string().describe("The UUID of the agent"),
+      limit: z.number().optional().describe("Max events to return (default 50)"),
+    },
+    async (args) => {
+      const events = getAgentAuditLog(args.agent_id, args.limit ?? 50);
+      return text(events);
+    }
+  );
+
+  server.tool(
+    "set_current_agent",
+    "Set the current agent identity. All subsequent mutations will be attributed to this agent in the audit log.",
+    {
+      agent_id: z.string().nullable().describe("Agent ID to set as current, or null to clear"),
+    },
+    async (args) => {
+      setCurrentAgent(args.agent_id);
+      return text({ current_agent_id: args.agent_id, message: args.agent_id ? `Set current agent to '${args.agent_id}'` : "Cleared agent identity" });
+    }
+  );
+
+  // --- Task Management Tools ---
+
+  server.tool(
+    "create_task",
+    "Create a new task. Tasks can be assigned to agents and linked to notes.",
+    {
+      title: z.string().describe("Task title"),
+      description: z.string().optional().describe("Detailed task description"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("Task priority (default: medium)"),
+      due_date: z.string().optional().describe("Due date in ISO format (e.g. 2026-03-01)"),
+      assigned_agent_id: z.string().optional().describe("Agent ID to assign this task to"),
+      linked_note_id: z.string().optional().describe("Note ID to link this task to"),
+    },
+    async (args) => {
+      const task = createTask(args.title, args.description, args.priority, args.due_date, args.assigned_agent_id, args.linked_note_id);
+      return text(task);
+    }
+  );
+
+  server.tool(
+    "list_tasks",
+    "List tasks with optional filters for status and assigned agent",
+    {
+      status: z.enum(["todo", "in_progress", "done"]).optional().describe("Filter by status"),
+      assigned_agent_id: z.string().optional().describe("Filter by assigned agent"),
+      limit: z.number().optional().describe("Max tasks to return (default 100)"),
+    },
+    async (args) => {
+      const tasks = listTasks(args.status, args.assigned_agent_id, args.limit);
+      return text(tasks);
+    }
+  );
+
+  server.tool(
+    "update_task",
+    "Update a task's properties (title, description, status, priority, due date, assignment, linked note)",
+    {
+      id: z.string().describe("Task ID to update"),
+      title: z.string().optional().describe("New title"),
+      description: z.string().optional().describe("New description"),
+      status: z.enum(["todo", "in_progress", "done"]).optional().describe("New status"),
+      priority: z.enum(["low", "medium", "high", "urgent"]).optional().describe("New priority"),
+      due_date: z.string().optional().describe("New due date"),
+      assigned_agent_id: z.string().optional().describe("New assigned agent"),
+      linked_note_id: z.string().optional().describe("New linked note"),
+    },
+    async (args) => {
+      const { id, ...updates } = args;
+      const task = updateTask(id, updates);
+      if (!task) return error(`Task '${id}' not found`);
+      return text(task);
+    }
+  );
+
+  server.tool(
+    "complete_task",
+    "Mark a task as done",
+    {
+      id: z.string().describe("Task ID to complete"),
+    },
+    async (args) => {
+      const task = completeTask(args.id);
+      if (!task) return error(`Task '${args.id}' not found`);
+      return text(task);
+    }
+  );
+
+  server.tool(
+    "assign_task",
+    "Assign a task to a specific agent",
+    {
+      id: z.string().describe("Task ID"),
+      agent_id: z.string().describe("Agent ID to assign the task to"),
+    },
+    async (args) => {
+      const task = assignTask(args.id, args.agent_id);
+      if (!task) return error(`Task '${args.id}' not found`);
+      return text(task);
+    }
+  );
+
+  // --- Workflow Template Tools ---
+
+  server.tool(
+    "list_workflow_templates",
+    "List all available workflow templates — multi-step agent workflows",
+    {},
+    async () => {
+      const workflows = listWorkflowTemplates();
+      return text(workflows);
+    }
+  );
+
+  server.tool(
+    "get_workflow_template",
+    "Get a specific workflow template with its steps",
+    {
+      id: z.string().describe("Workflow template ID"),
+    },
+    async (args) => {
+      const workflow = getWorkflowTemplate(args.id);
+      if (!workflow) return error(`Workflow template '${args.id}' not found`);
+      return text(workflow);
+    }
+  );
+
+  server.tool(
+    "execute_workflow",
+    "Execute a workflow template. Returns the steps with their results for the agent to follow.",
+    {
+      id: z.string().describe("Workflow template ID to execute"),
+    },
+    async (args) => {
+      const workflow = getWorkflowTemplate(args.id);
+      if (!workflow) return error(`Workflow template '${args.id}' not found`);
+      return text({
+        message: `Workflow '${workflow.name}' loaded with ${workflow.steps.length} steps. Execute each step in order using the specified tools.`,
+        workflow: workflow.name,
+        steps: workflow.steps,
+      });
+    }
+  );
+
+  server.tool(
+    "create_workflow_template",
+    "Create a new workflow template with ordered steps",
+    {
+      name: z.string().describe("Unique workflow name"),
+      description: z.string().optional().describe("Description of what the workflow does"),
+      category: z.enum(["general", "daily", "research", "project"]).optional().describe("Workflow category"),
+      steps: z.array(z.object({
+        order: z.number().describe("Step order (1-based)"),
+        tool_name: z.string().describe("MCP tool to call"),
+        description: z.string().describe("What this step does"),
+        params: z.record(z.string(), z.unknown()).describe("Parameters for the tool"),
+        use_result_as: z.string().optional().describe("Variable name to store the result as"),
+      })).describe("Ordered list of workflow steps"),
+    },
+    async (args) => {
+      try {
+        const workflow = createWorkflowTemplate(args.name, args.description, args.category, args.steps);
+        return text(workflow);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  // --- Webhook Management Extensions ---
+
+  server.tool(
+    "update_webhook",
+    "Update a webhook's URL, event types, or active status",
+    {
+      id: z.string().describe("Webhook ID to update"),
+      url: z.string().optional().describe("New URL"),
+      event_types: z.array(z.string()).optional().describe("New event types"),
+      is_active: z.boolean().optional().describe("Enable/disable the webhook"),
+    },
+    async (args) => {
+      const { id, ...updates } = args;
+      const webhook = updateWebhook(id, updates);
+      if (!webhook) return error(`Webhook '${id}' not found`);
+      return text(webhook);
+    }
+  );
+
+  server.tool(
+    "test_webhook",
+    "Send a test delivery to a webhook and return the result",
+    {
+      id: z.string().describe("Webhook ID to test"),
+    },
+    async (args) => {
+      try {
+        const log = await testWebhook(args.id);
+        return text(log);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  server.tool(
+    "get_webhook_logs",
+    "Get delivery logs for a webhook — shows status codes, responses, and errors",
+    {
+      webhook_id: z.string().describe("Webhook ID to get logs for"),
+      limit: z.number().optional().describe("Max logs to return (default 50)"),
+    },
+    async (args) => {
+      const logs = getWebhookLogs(args.webhook_id, args.limit);
+      return text(logs);
+    }
+  );
+
+  // --- Agent-Workspace Binding ---
+
+  server.tool(
+    "bind_agent_workspace",
+    "Bind an agent to a workspace, granting it access to notes in that workspace",
+    {
+      agent_id: z.string().describe("Agent ID"),
+      workspace_id: z.string().describe("Workspace ID"),
+      role: z.enum(["member", "admin"]).optional().describe("Agent's role in the workspace (default: member)"),
+    },
+    async (args) => {
+      try {
+        const binding = bindAgentWorkspace(args.agent_id, args.workspace_id, args.role);
+        return text(binding);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  server.tool(
+    "get_agent_workspaces",
+    "Get all workspaces an agent is bound to",
+    {
+      agent_id: z.string().describe("Agent ID"),
+    },
+    async (args) => {
+      const workspaces = getAgentWorkspaces(args.agent_id);
+      return text(workspaces);
     }
   );
 

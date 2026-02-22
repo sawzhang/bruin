@@ -79,6 +79,24 @@ export function CommandPalette() {
       icon: "\u229e",
       action: () => { useUIStore.getState().toggleTemplatePicker(); toggleCommandPalette(); },
     },
+    {
+      id: "workflows",
+      label: "Run Workflow...",
+      icon: "\u25b6",
+      action: () => { useUIStore.getState().toggleWorkflowBrowser(); toggleCommandPalette(); },
+    },
+    {
+      id: "tasks",
+      label: "Tasks",
+      icon: "\u2610",
+      action: () => { useUIStore.getState().toggleTaskPanel(); toggleCommandPalette(); },
+    },
+    {
+      id: "agents",
+      label: "Agent Dashboard",
+      icon: "\u2b24",
+      action: () => { useUIStore.getState().toggleAgentDashboard(); toggleCommandPalette(); },
+    },
     ...(selectedNoteId ? [
       {
         id: "export-md",

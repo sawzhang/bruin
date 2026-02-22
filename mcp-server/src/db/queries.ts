@@ -80,10 +80,105 @@ export interface ActivityEventRow {
   timestamp: string;
   summary: string;
   data: string;
+  agent_id: string | null;
+}
+
+// --- Agent types ---
+
+export interface AgentRow {
+  id: string;
+  name: string;
+  description: string;
+  capabilities: string; // JSON array
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentWithCaps {
+  id: string;
+  name: string;
+  description: string;
+  capabilities: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Task types ---
+
+export interface TaskRow {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  due_date: string | null;
+  assigned_agent_id: string | null;
+  linked_note_id: string | null;
+  workspace_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Workflow types ---
+
+export interface WorkflowTemplateRow {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  steps: string; // JSON array
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowStep {
+  order: number;
+  tool_name: string;
+  description: string;
+  params: Record<string, unknown>;
+  use_result_as?: string;
+}
+
+export interface WorkflowTemplateWithSteps {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  steps: WorkflowStep[];
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Webhook Log types ---
+
+export interface WebhookLogRow {
+  id: number;
+  webhook_id: string;
+  event_type: string;
+  payload: string;
+  status_code: number | null;
+  response_body: string | null;
+  attempt: number;
+  success: number;
+  error_message: string | null;
+  timestamp: string;
 }
 
 function now(): string {
   return new Date().toISOString();
+}
+
+// Current agent context for MCP server
+let currentAgentId: string | null = null;
+
+export function setCurrentAgent(agentId: string | null): void {
+  currentAgentId = agentId;
+}
+
+export function getCurrentAgent(): string | null {
+  return currentAgentId;
 }
 
 export function logActivity(
@@ -91,11 +186,13 @@ export function logActivity(
   eventType: string,
   noteId: string | null,
   summary: string,
-  data: string = "{}"
+  data: string = "{}",
+  agentId?: string | null
 ): void {
+  const effectiveAgentId = agentId ?? currentAgentId;
   db.prepare(
-    "INSERT INTO activity_events (actor, event_type, note_id, timestamp, summary, data) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(actor, eventType, noteId, now(), summary, data);
+    "INSERT INTO activity_events (actor, event_type, note_id, timestamp, summary, data, agent_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(actor, eventType, noteId, now(), summary, data, effectiveAgentId);
   // Fire webhooks asynchronously
   fireWebhooks(eventType, noteId, summary).catch(() => {});
 }
@@ -1134,4 +1231,271 @@ export function semanticSearch(
       tags: getTagsForNote(note.id),
     };
   });
+}
+
+// --- Agent CRUD ---
+
+function parseAgent(row: AgentRow): AgentWithCaps {
+  return {
+    ...row,
+    capabilities: JSON.parse(row.capabilities || "[]"),
+    is_active: row.is_active !== 0,
+  };
+}
+
+export function registerAgent(
+  name: string,
+  description = "",
+  capabilities: string[] = []
+): AgentWithCaps {
+  const id = uuidv4();
+  const timestamp = now();
+  const capsJson = JSON.stringify(capabilities);
+  db.prepare(
+    "INSERT INTO agents (id, name, description, capabilities, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, name, description, capsJson, timestamp, timestamp);
+  return { id, name, description, capabilities, is_active: true, created_at: timestamp, updated_at: timestamp };
+}
+
+export function listAgents(): AgentWithCaps[] {
+  const rows = db.prepare("SELECT * FROM agents ORDER BY name").all() as AgentRow[];
+  return rows.map(parseAgent);
+}
+
+export function getAgent(id: string): AgentWithCaps | null {
+  const row = db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as AgentRow | undefined;
+  return row ? parseAgent(row) : null;
+}
+
+export function getAgentAuditLog(agentId: string, limit = 50): ActivityEventRow[] {
+  return db.prepare(
+    "SELECT * FROM activity_events WHERE agent_id = ? ORDER BY timestamp DESC LIMIT ?"
+  ).all(agentId, limit) as ActivityEventRow[];
+}
+
+// --- Task CRUD ---
+
+export function createTask(
+  title: string,
+  description = "",
+  priority = "medium",
+  dueDate?: string,
+  assignedAgentId?: string,
+  linkedNoteId?: string,
+  workspaceId?: string
+): TaskRow {
+  const id = uuidv4();
+  const timestamp = now();
+  db.prepare(
+    "INSERT INTO tasks (id, title, description, priority, due_date, assigned_agent_id, linked_note_id, workspace_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(id, title, description, priority, dueDate ?? null, assignedAgentId ?? null, linkedNoteId ?? null, workspaceId ?? currentWorkspaceId, timestamp, timestamp);
+  logActivity("agent", "task_created", null, `Created task '${title}'`);
+  notifyTauri();
+  return { id, title, description, status: "todo", priority, due_date: dueDate ?? null, assigned_agent_id: assignedAgentId ?? null, linked_note_id: linkedNoteId ?? null, workspace_id: workspaceId ?? currentWorkspaceId, created_at: timestamp, updated_at: timestamp };
+}
+
+export function listTasks(
+  status?: string,
+  assignedAgentId?: string,
+  limit = 100
+): TaskRow[] {
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+  if (assignedAgentId) {
+    conditions.push("assigned_agent_id = ?");
+    params.push(assignedAgentId);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  params.push(limit);
+
+  return db.prepare(
+    `SELECT * FROM tasks ${whereClause} ORDER BY CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END, updated_at DESC LIMIT ?`
+  ).all(...params) as TaskRow[];
+}
+
+export function updateTask(
+  id: string,
+  updates: { title?: string; description?: string; status?: string; priority?: string; due_date?: string; assigned_agent_id?: string; linked_note_id?: string }
+): TaskRow | null {
+  const existing = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | undefined;
+  if (!existing) return null;
+
+  const title = updates.title ?? existing.title;
+  const description = updates.description ?? existing.description;
+  const status = updates.status ?? existing.status;
+  const priority = updates.priority ?? existing.priority;
+  const dueDate = updates.due_date ?? existing.due_date;
+  const assignedAgentId = updates.assigned_agent_id ?? existing.assigned_agent_id;
+  const linkedNoteId = updates.linked_note_id ?? existing.linked_note_id;
+  const timestamp = now();
+
+  db.prepare(
+    "UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, assigned_agent_id = ?, linked_note_id = ?, updated_at = ? WHERE id = ?"
+  ).run(title, description, status, priority, dueDate, assignedAgentId, linkedNoteId, timestamp, id);
+
+  logActivity("agent", "task_updated", null, `Updated task '${title}'`);
+  notifyTauri();
+  return db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow;
+}
+
+export function completeTask(id: string): TaskRow | null {
+  const existing = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | undefined;
+  if (!existing) return null;
+  const timestamp = now();
+  db.prepare("UPDATE tasks SET status = 'done', updated_at = ? WHERE id = ?").run(timestamp, id);
+  logActivity("agent", "task_completed", null, `Completed task '${existing.title}'`);
+  notifyTauri();
+  return db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow;
+}
+
+export function assignTask(id: string, agentId: string): TaskRow | null {
+  const existing = db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | undefined;
+  if (!existing) return null;
+  const timestamp = now();
+  db.prepare("UPDATE tasks SET assigned_agent_id = ?, updated_at = ? WHERE id = ?").run(agentId, timestamp, id);
+  logActivity("agent", "task_assigned", null, `Assigned task '${existing.title}' to agent '${agentId}'`);
+  notifyTauri();
+  return db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow;
+}
+
+// --- Workflow Template CRUD ---
+
+function parseWorkflow(row: WorkflowTemplateRow): WorkflowTemplateWithSteps {
+  return {
+    ...row,
+    steps: JSON.parse(row.steps || "[]"),
+  };
+}
+
+export function listWorkflowTemplates(): WorkflowTemplateWithSteps[] {
+  const rows = db.prepare("SELECT * FROM workflow_templates ORDER BY name").all() as WorkflowTemplateRow[];
+  return rows.map(parseWorkflow);
+}
+
+export function getWorkflowTemplate(id: string): WorkflowTemplateWithSteps | null {
+  const row = db.prepare("SELECT * FROM workflow_templates WHERE id = ?").get(id) as WorkflowTemplateRow | undefined;
+  return row ? parseWorkflow(row) : null;
+}
+
+export function createWorkflowTemplate(
+  name: string,
+  description = "",
+  category = "general",
+  steps: WorkflowStep[] = []
+): WorkflowTemplateWithSteps {
+  const id = uuidv4();
+  const timestamp = now();
+  db.prepare(
+    "INSERT INTO workflow_templates (id, name, description, category, steps, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(id, name, description, category, JSON.stringify(steps), timestamp, timestamp);
+  return { id, name, description, category, steps, created_at: timestamp, updated_at: timestamp };
+}
+
+// --- Webhook Management Extensions ---
+
+export function updateWebhook(
+  id: string,
+  updates: { url?: string; event_types?: string[]; is_active?: boolean }
+): WebhookWithTypes | null {
+  const row = db.prepare("SELECT * FROM webhooks WHERE id = ?").get(id) as WebhookRow | undefined;
+  if (!row) return null;
+  const existing = parseWebhook(row);
+
+  const newUrl = updates.url ?? existing.url;
+  const newTypes = updates.event_types ?? existing.event_types;
+  const newActive = updates.is_active ?? existing.is_active;
+
+  db.prepare(
+    "UPDATE webhooks SET url = ?, event_types = ?, is_active = ? WHERE id = ?"
+  ).run(newUrl, JSON.stringify(newTypes), newActive ? 1 : 0, id);
+
+  const updated = db.prepare("SELECT * FROM webhooks WHERE id = ?").get(id) as WebhookRow;
+  return parseWebhook(updated);
+}
+
+export async function testWebhook(id: string): Promise<WebhookLogRow> {
+  const row = db.prepare("SELECT * FROM webhooks WHERE id = ?").get(id) as WebhookRow | undefined;
+  if (!row) throw new Error(`Webhook '${id}' not found`);
+  const webhook = parseWebhook(row);
+  const timestamp = now();
+
+  const payload = JSON.stringify({
+    event_type: "test",
+    note_id: null,
+    summary: "Test webhook delivery",
+    timestamp,
+  });
+
+  const { createHmac } = await import("crypto");
+  const signature = createHmac("sha256", webhook.secret).update(payload).digest("hex");
+
+  let statusCode: number | null = null;
+  let responseBody: string | null = null;
+  let success = false;
+  let errorMessage: string | null = null;
+
+  try {
+    const response = await fetch(webhook.url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Webhook-Signature": signature },
+      body: payload,
+    });
+    statusCode = response.status;
+    responseBody = await response.text();
+    success = response.ok;
+  } catch (e: unknown) {
+    errorMessage = (e as Error).message;
+  }
+
+  const result = db.prepare(
+    "INSERT INTO webhook_logs (webhook_id, event_type, payload, status_code, response_body, attempt, success, error_message, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(id, "test", payload, statusCode, responseBody, 1, success ? 1 : 0, errorMessage, timestamp);
+
+  return {
+    id: Number(result.lastInsertRowid),
+    webhook_id: id,
+    event_type: "test",
+    payload,
+    status_code: statusCode,
+    response_body: responseBody,
+    attempt: 1,
+    success: success ? 1 : 0,
+    error_message: errorMessage,
+    timestamp,
+  };
+}
+
+export function getWebhookLogs(webhookId: string, limit = 50): WebhookLogRow[] {
+  return db.prepare(
+    "SELECT * FROM webhook_logs WHERE webhook_id = ? ORDER BY timestamp DESC LIMIT ?"
+  ).all(webhookId, limit) as WebhookLogRow[];
+}
+
+// --- Agent-Workspace Binding ---
+
+export interface AgentWorkspaceRow {
+  agent_id: string;
+  workspace_id: string;
+  role: string;
+  created_at: string;
+}
+
+export function bindAgentWorkspace(agentId: string, workspaceId: string, role = "member"): AgentWorkspaceRow {
+  const timestamp = now();
+  db.prepare(
+    "INSERT OR REPLACE INTO agent_workspaces (agent_id, workspace_id, role, created_at) VALUES (?, ?, ?, ?)"
+  ).run(agentId, workspaceId, role, timestamp);
+  return { agent_id: agentId, workspace_id: workspaceId, role, created_at: timestamp };
+}
+
+export function getAgentWorkspaces(agentId: string): AgentWorkspaceRow[] {
+  return db.prepare(
+    "SELECT * FROM agent_workspaces WHERE agent_id = ?"
+  ).all(agentId) as AgentWorkspaceRow[];
 }

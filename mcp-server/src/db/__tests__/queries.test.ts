@@ -22,7 +22,8 @@ function createTestDb(): Database.Database {
       file_path TEXT,
       sync_hash TEXT,
       state TEXT NOT NULL DEFAULT 'draft',
-      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+      version INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -65,6 +66,16 @@ function createTestDb(): Database.Database {
       PRIMARY KEY (note_id, key)
     );
 
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      capabilities TEXT NOT NULL DEFAULT '[]',
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS activity_events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       actor TEXT NOT NULL DEFAULT 'user',
@@ -72,7 +83,8 @@ function createTestDb(): Database.Database {
       note_id TEXT,
       timestamp TEXT NOT NULL,
       summary TEXT NOT NULL,
-      data TEXT NOT NULL DEFAULT '{}'
+      data TEXT NOT NULL DEFAULT '{}',
+      agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS templates (
@@ -120,6 +132,51 @@ function createTestDb(): Database.Database {
       embedding TEXT NOT NULL,
       model TEXT NOT NULL DEFAULT 'all-MiniLM-L6-v2',
       updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'todo',
+      priority TEXT NOT NULL DEFAULT 'medium',
+      due_date TEXT,
+      assigned_agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+      linked_note_id TEXT REFERENCES notes(id) ON DELETE SET NULL,
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS workflow_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'general',
+      steps TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS webhook_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      webhook_id TEXT NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      status_code INTEGER,
+      response_body TEXT,
+      attempt INTEGER NOT NULL DEFAULT 1,
+      success INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT,
+      timestamp TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_workspaces (
+      agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+      workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (agent_id, workspace_id)
     );
   `);
 

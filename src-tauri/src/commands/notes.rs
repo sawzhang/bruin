@@ -23,10 +23,22 @@ pub(crate) fn log_activity(
     summary: &str,
     data: &str,
 ) {
+    log_activity_with_agent(conn, actor, event_type, note_id, summary, data, None);
+}
+
+pub(crate) fn log_activity_with_agent(
+    conn: &Connection,
+    actor: &str,
+    event_type: &str,
+    note_id: Option<&str>,
+    summary: &str,
+    data: &str,
+    agent_id: Option<&str>,
+) {
     let now = Utc::now().to_rfc3339();
     let _ = conn.execute(
-        "INSERT INTO activity_events (actor, event_type, note_id, timestamp, summary, data) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![actor, event_type, note_id, now, summary, data],
+        "INSERT INTO activity_events (actor, event_type, note_id, timestamp, summary, data, agent_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        rusqlite::params![actor, event_type, note_id, now, summary, data, agent_id],
     );
     fire_webhooks(conn, event_type, note_id, summary);
 }
@@ -220,7 +232,7 @@ pub(crate) fn batch_fetch_tags(conn: &Connection, note_ids: &[String]) -> Result
 pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
     let note = conn
         .query_row(
-            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash, state, workspace_id FROM notes WHERE id = ?1",
+            "SELECT id, title, content, created_at, updated_at, is_trashed, is_pinned, word_count, file_path, sync_hash, state, workspace_id, version FROM notes WHERE id = ?1",
             [id],
             |row| {
                 Ok(Note {
@@ -237,6 +249,7 @@ pub(crate) fn fetch_note(conn: &Connection, id: &str) -> Result<Note, String> {
                     tags: vec![],
                     state: row.get::<_, String>(10).unwrap_or_else(|_| "draft".to_string()),
                     workspace_id: row.get(11)?,
+                    version: row.get::<_, i32>(12).unwrap_or(1),
                 })
             },
         )
@@ -298,14 +311,26 @@ pub fn update_note(
     let now = Utc::now().to_rfc3339();
 
     let existing = fetch_note(&conn, &params.id)?;
+
+    // Optimistic locking: if expected_version is provided, check it matches
+    if let Some(expected) = params.expected_version {
+        if existing.version != expected {
+            return Err(format!(
+                "Version conflict: expected {} but found {}. Another agent may have updated this note.",
+                expected, existing.version
+            ));
+        }
+    }
+
     let title = params.title.unwrap_or(existing.title);
     let content = params.content.unwrap_or(existing.content);
     let word_count = compute_word_count(&content);
     let tags = extract_tags(&content);
+    let new_version = existing.version + 1;
 
     conn.execute(
-        "UPDATE notes SET title = ?1, content = ?2, updated_at = ?3, word_count = ?4 WHERE id = ?5",
-        rusqlite::params![title, content, now, word_count, params.id],
+        "UPDATE notes SET title = ?1, content = ?2, updated_at = ?3, word_count = ?4, version = ?5 WHERE id = ?6",
+        rusqlite::params![title, content, now, word_count, new_version, params.id],
     )
     .map_err(|e| e.to_string())?;
 

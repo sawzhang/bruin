@@ -118,6 +118,7 @@ fn fetch_all_notes(conn: &Connection) -> Result<Vec<Note>, String> {
                 tags: vec![],
                 state: row.get::<_, String>(10).unwrap_or_else(|_| "draft".to_string()),
                 workspace_id: row.get(11)?,
+                version: row.get::<_, i32>(12).unwrap_or(1),
             })
         })
         .map_err(|e| e.to_string())?;

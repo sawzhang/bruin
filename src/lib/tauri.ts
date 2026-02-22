@@ -14,6 +14,10 @@ import type { SyncState } from "../types/sync";
 import type { Template } from "../types/template";
 import type { Workspace } from "../types/workspace";
 import type { KnowledgeGraph } from "../types/graph";
+import type { Agent } from "../types/agent";
+import type { Task, TaskStatus, TaskPriority } from "../types/task";
+import type { WorkflowTemplate, WorkflowStep } from "../types/workflow";
+import type { Webhook, WebhookLog } from "../types/webhook";
 
 // Note commands
 export async function createNote(params: CreateNoteParams): Promise<Note> {
@@ -104,8 +108,9 @@ export async function createNoteFromTemplate(
 export async function getActivityFeed(
   limit?: number,
   noteId?: string,
+  agentId?: string,
 ): Promise<ActivityEvent[]> {
-  return invoke("get_activity_feed", { limit: limit ?? 50, noteId });
+  return invoke("get_activity_feed", { limit: limit ?? 50, noteId, agentId });
 }
 
 // Workspace commands
@@ -191,6 +196,205 @@ export async function exportNoteMarkdown(
 
 export async function exportNoteHtml(id: string): Promise<string> {
   return invoke("export_note_html", { id });
+}
+
+// Agent commands
+export async function registerAgent(
+  name: string,
+  description?: string,
+  capabilities?: string[],
+): Promise<Agent> {
+  return invoke("register_agent", { name, description, capabilities });
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  return invoke("list_agents");
+}
+
+export async function getAgent(id: string): Promise<Agent> {
+  return invoke("get_agent", { id });
+}
+
+export async function updateAgent(
+  id: string,
+  name?: string,
+  description?: string,
+  capabilities?: string[],
+): Promise<Agent> {
+  return invoke("update_agent", { id, name, description, capabilities });
+}
+
+export async function deactivateAgent(id: string): Promise<Agent> {
+  return invoke("deactivate_agent", { id });
+}
+
+export async function getAgentAuditLog(
+  agentId: string,
+  limit?: number,
+): Promise<import("../types/activity").ActivityEvent[]> {
+  return invoke("get_agent_audit_log", { agentId, limit });
+}
+
+// Agent-Workspace commands
+export async function bindAgentWorkspace(
+  agentId: string,
+  workspaceId: string,
+  role?: string,
+): Promise<{ agent_id: string; workspace_id: string; role: string; created_at: string }> {
+  return invoke("bind_agent_workspace", { agentId, workspaceId, role });
+}
+
+export async function unbindAgentWorkspace(
+  agentId: string,
+  workspaceId: string,
+): Promise<void> {
+  return invoke("unbind_agent_workspace", { agentId, workspaceId });
+}
+
+export async function getAgentWorkspaces(
+  agentId: string,
+): Promise<Array<{ agent_id: string; workspace_id: string; role: string; created_at: string }>> {
+  return invoke("get_agent_workspaces", { agentId });
+}
+
+export async function getWorkspaceAgents(
+  workspaceId: string,
+): Promise<Array<{ agent_id: string; workspace_id: string; role: string; created_at: string }>> {
+  return invoke("get_workspace_agents", { workspaceId });
+}
+
+// Task commands
+export async function createTask(
+  title: string,
+  description?: string,
+  priority?: TaskPriority,
+  dueDate?: string,
+  assignedAgentId?: string,
+  linkedNoteId?: string,
+  workspaceId?: string,
+): Promise<Task> {
+  return invoke("create_task", {
+    title,
+    description,
+    priority,
+    dueDate: dueDate ?? null,
+    assignedAgentId: assignedAgentId ?? null,
+    linkedNoteId: linkedNoteId ?? null,
+    workspaceId: workspaceId ?? null,
+  });
+}
+
+export async function listTasks(
+  status?: TaskStatus,
+  assignedAgentId?: string,
+  workspaceId?: string,
+  limit?: number,
+): Promise<Task[]> {
+  return invoke("list_tasks", {
+    status: status ?? null,
+    assignedAgentId: assignedAgentId ?? null,
+    workspaceId: workspaceId ?? null,
+    limit: limit ?? 100,
+  });
+}
+
+export async function getTask(id: string): Promise<Task> {
+  return invoke("get_task", { id });
+}
+
+export async function updateTask(
+  id: string,
+  title?: string,
+  description?: string,
+  status?: TaskStatus,
+  priority?: TaskPriority,
+  dueDate?: string,
+  assignedAgentId?: string,
+  linkedNoteId?: string,
+): Promise<Task> {
+  return invoke("update_task", {
+    id,
+    title,
+    description,
+    status,
+    priority,
+    dueDate: dueDate ?? null,
+    assignedAgentId: assignedAgentId ?? null,
+    linkedNoteId: linkedNoteId ?? null,
+  });
+}
+
+export async function completeTask(id: string): Promise<Task> {
+  return invoke("complete_task", { id });
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  return invoke("delete_task", { id });
+}
+
+// Workflow commands
+export async function listWorkflowTemplates(): Promise<WorkflowTemplate[]> {
+  return invoke("list_workflow_templates");
+}
+
+export async function getWorkflowTemplate(id: string): Promise<WorkflowTemplate> {
+  return invoke("get_workflow_template", { id });
+}
+
+export async function createWorkflowTemplate(
+  name: string,
+  description?: string,
+  category?: string,
+  steps?: WorkflowStep[],
+): Promise<WorkflowTemplate> {
+  return invoke("create_workflow_template", {
+    name,
+    description,
+    category,
+    steps: steps ?? [],
+  });
+}
+
+export async function deleteWorkflowTemplate(id: string): Promise<void> {
+  return invoke("delete_workflow_template", { id });
+}
+
+// Webhook management commands
+export async function updateWebhook(
+  id: string,
+  url?: string,
+  eventTypes?: string[],
+  isActive?: boolean,
+): Promise<Webhook> {
+  return invoke("update_webhook", { id, url, eventTypes, isActive });
+}
+
+export async function testWebhook(id: string): Promise<WebhookLog> {
+  return invoke("test_webhook", { id });
+}
+
+export async function getWebhookLogs(
+  webhookId: string,
+  limit?: number,
+): Promise<WebhookLog[]> {
+  return invoke("get_webhook_logs", { webhookId, limit });
+}
+
+// Webhook CRUD (re-export existing with proper types)
+export async function listWebhooks(): Promise<Webhook[]> {
+  return invoke("list_webhooks");
+}
+
+export async function registerWebhook(
+  url: string,
+  eventTypes: string[],
+  secret: string,
+): Promise<Webhook> {
+  return invoke("register_webhook", { url, eventTypes, secret });
+}
+
+export async function deleteWebhook(id: string): Promise<void> {
+  return invoke("delete_webhook", { id });
 }
 
 // Image commands

@@ -17,6 +17,10 @@ import { TemplatePicker } from "../templates/TemplatePicker";
 import { KnowledgeGraphView } from "../graph/KnowledgeGraphView";
 import { ToastContainer } from "../ui/Toast";
 import { ErrorBoundary } from "../ui/ErrorBoundary";
+import { TaskPanel } from "../tasks/TaskPanel";
+import { AgentDashboard } from "../agents/AgentDashboard";
+import { WorkflowBrowser } from "../workflows/WorkflowBrowser";
+import { WebhookManager } from "../webhooks/WebhookManager";
 
 export function AppLayout() {
   const sidebarWidth = useUIStore((s) => s.sidebarWidth);
@@ -26,6 +30,7 @@ export function AppLayout() {
   const theme = useUIStore((s) => s.theme);
   const isActivityPanelOpen = useUIStore((s) => s.isActivityPanelOpen);
   const isGraphViewOpen = useUIStore((s) => s.isGraphViewOpen);
+  const isTaskPanelOpen = useUIStore((s) => s.isTaskPanelOpen);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const loadTags = useTagStore((s) => s.loadTags);
   const loadWorkspaces = useWorkspaceStore((s) => s.loadWorkspaces);
@@ -77,6 +82,13 @@ export function AppLayout() {
         </>
       )}
 
+      {/* Task Panel */}
+      {isTaskPanelOpen && (
+        <div className="w-[280px] shrink-0 h-full border-l border-bear-border">
+          <TaskPanel />
+        </div>
+      )}
+
       {/* Activity Panel */}
       {isActivityPanelOpen && (
         <div className="w-[280px] shrink-0 h-full border-l border-bear-border">
@@ -89,6 +101,9 @@ export function AppLayout() {
       <ThemePicker />
       <TemplatePicker />
       <SettingsPanel />
+      <AgentDashboard />
+      <WorkflowBrowser />
+      <WebhookManager />
       <ToastContainer />
     </div>
   );
