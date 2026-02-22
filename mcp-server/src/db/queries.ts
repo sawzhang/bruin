@@ -1499,3 +1499,126 @@ export function getAgentWorkspaces(agentId: string): AgentWorkspaceRow[] {
     "SELECT * FROM agent_workspaces WHERE agent_id = ?"
   ).all(agentId) as AgentWorkspaceRow[];
 }
+
+// --- Workflow Executor ---
+
+export interface WorkflowStepResult {
+  step: number;
+  tool: string;
+  description: string;
+  result: unknown;
+}
+
+const TOOL_FUNCTION_MAP: Record<string, (params: Record<string, unknown>) => unknown> = {
+  get_daily_note: (params) => getDailyNote(params.date as string | undefined),
+  list_tasks: (params) => listTasks(params.status as string | undefined, params.assigned_agent_id as string | undefined),
+  append_to_note: (params) => appendToNote(params.note_id as string, params.content as string),
+  list_notes: (params) => listNotes(params.tag as string | undefined),
+  create_note: (params) => createNote(params.title as string, params.content as string, params.tags as string[] | undefined),
+  create_from_template: (params) => {
+    let templateId = params.template_id as string | undefined;
+    if (!templateId && params.template_name) {
+      const row = db.prepare("SELECT id FROM templates WHERE name = ?").get(params.template_name as string) as { id: string } | undefined;
+      if (!row) throw new Error(`Template '${params.template_name}' not found`);
+      templateId = row.id;
+    }
+    if (!templateId) throw new Error("template_id or template_name required");
+    return createNoteFromTemplate(templateId, params.title as string | undefined);
+  },
+  create_task: (params) =>
+    createTask(
+      params.title as string,
+      params.description as string | undefined,
+      params.priority as string | undefined,
+      params.due_date as string | undefined,
+      params.assigned_agent_id as string | undefined,
+      params.linked_note_id as string | undefined
+    ),
+  search_notes: (params) => searchNotes(params.query as string),
+};
+
+function interpolateParams(
+  params: Record<string, unknown>,
+  results: Record<string, unknown>
+): Record<string, unknown> {
+  const dateStr = new Date().toISOString().split("T")[0];
+  const out: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string") {
+      let interpolated = value.replace(/\{\{date\}\}/g, dateStr);
+      // Replace {{step_name.field}} with results[step_name].field
+      interpolated = interpolated.replace(
+        /\{\{(\w+)\.(\w+)\}\}/g,
+        (_match, stepName: string, field: string) => {
+          const stepResult = results[stepName];
+          if (stepResult != null && typeof stepResult === "object") {
+            const val = (stepResult as Record<string, unknown>)[field];
+            return val != null ? String(val) : "";
+          }
+          return "";
+        }
+      );
+      // Replace {{step_name}} with JSON.stringify(results[step_name])
+      interpolated = interpolated.replace(
+        /\{\{(\w+)\}\}/g,
+        (_match, stepName: string) => {
+          if (stepName in results) {
+            return JSON.stringify(results[stepName]);
+          }
+          return "";
+        }
+      );
+      out[key] = interpolated;
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+export function executeWorkflow(id: string): WorkflowStepResult[] {
+  const workflow = getWorkflowTemplate(id);
+  if (!workflow) throw new Error(`Workflow template '${id}' not found`);
+
+  const steps = [...workflow.steps].sort((a, b) => a.order - b.order);
+  const results: Record<string, unknown> = {};
+  const stepResults: WorkflowStepResult[] = [];
+
+  for (const step of steps) {
+    const fn = TOOL_FUNCTION_MAP[step.tool_name];
+    if (!fn) {
+      stepResults.push({
+        step: step.order,
+        tool: step.tool_name,
+        description: step.description,
+        result: { error: `Unknown tool: ${step.tool_name}` },
+      });
+      continue;
+    }
+
+    const interpolatedParams = interpolateParams(step.params, results);
+
+    try {
+      const result = fn(interpolatedParams);
+      if (step.use_result_as) {
+        results[step.use_result_as] = result;
+      }
+      stepResults.push({
+        step: step.order,
+        tool: step.tool_name,
+        description: step.description,
+        result,
+      });
+    } catch (e: unknown) {
+      stepResults.push({
+        step: step.order,
+        tool: step.tool_name,
+        description: step.description,
+        result: { error: (e as Error).message },
+      });
+    }
+  }
+
+  return stepResults;
+}

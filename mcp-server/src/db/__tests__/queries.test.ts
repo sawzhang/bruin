@@ -891,3 +891,302 @@ describe("semanticSearch", () => {
     expect(results.length).toBe(0);
   });
 });
+
+// --- v0.3: Agent CRUD Tests ---
+
+describe("registerAgent", () => {
+  it("creates agent with generated id", async () => {
+    const { registerAgent } = await getQueries();
+    const agent = registerAgent("test-agent", "A test agent", ["search", "notes"]);
+    expect(agent.id).toBeDefined();
+    expect(agent.name).toBe("test-agent");
+    expect(agent.description).toBe("A test agent");
+    expect(agent.capabilities).toEqual(["search", "notes"]);
+    expect(agent.is_active).toBe(true);
+  });
+
+  it("rejects duplicate name", async () => {
+    const { registerAgent } = await getQueries();
+    registerAgent("unique-agent");
+    expect(() => registerAgent("unique-agent")).toThrow();
+  });
+});
+
+describe("listAgents", () => {
+  it("returns registered agents sorted by name", async () => {
+    const { registerAgent, listAgents } = await getQueries();
+    registerAgent("zeta-agent");
+    registerAgent("alpha-agent");
+    const agents = listAgents();
+    expect(agents.length).toBe(2);
+    expect(agents[0].name).toBe("alpha-agent");
+    expect(agents[1].name).toBe("zeta-agent");
+  });
+});
+
+describe("getAgent", () => {
+  it("returns agent by id", async () => {
+    const { registerAgent, getAgent } = await getQueries();
+    const created = registerAgent("lookup-agent", "desc", ["cap1"]);
+    const fetched = getAgent(created.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.name).toBe("lookup-agent");
+    expect(fetched!.capabilities).toEqual(["cap1"]);
+  });
+
+  it("returns null for non-existent id", async () => {
+    const { getAgent } = await getQueries();
+    expect(getAgent("nonexistent")).toBeNull();
+  });
+});
+
+describe("getAgentAuditLog", () => {
+  it("returns events for agent", async () => {
+    const { registerAgent, setCurrentAgent, createNote, getAgentAuditLog } = await getQueries();
+    const agent = registerAgent("audit-agent");
+    setCurrentAgent(agent.id);
+    createNote("Agent Note", "Created by agent");
+    setCurrentAgent(null);
+
+    const events = getAgentAuditLog(agent.id);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events[0].agent_id).toBe(agent.id);
+  });
+});
+
+// --- v0.3: Task Management Tests ---
+
+describe("createTask", () => {
+  it("creates task with defaults (status=todo, priority=medium)", async () => {
+    const { createTask } = await getQueries();
+    const task = createTask("My Task");
+    expect(task.id).toBeDefined();
+    expect(task.title).toBe("My Task");
+    expect(task.status).toBe("todo");
+    expect(task.priority).toBe("medium");
+    expect(task.assigned_agent_id).toBeNull();
+  });
+});
+
+describe("listTasks", () => {
+  it("returns tasks ordered by priority", async () => {
+    const { createTask, listTasks } = await getQueries();
+    createTask("Low", "", "low");
+    createTask("Urgent", "", "urgent");
+    createTask("Medium", "", "medium");
+    const tasks = listTasks();
+    expect(tasks[0].title).toBe("Urgent");
+    expect(tasks[tasks.length - 1].title).toBe("Low");
+  });
+
+  it("filters by status", async () => {
+    const { createTask, completeTask, listTasks } = await getQueries();
+    const t1 = createTask("Done Task");
+    createTask("Todo Task");
+    completeTask(t1.id);
+
+    const done = listTasks("done");
+    expect(done.length).toBe(1);
+    expect(done[0].title).toBe("Done Task");
+  });
+
+  it("filters by assigned agent", async () => {
+    const { registerAgent, createTask, assignTask, listTasks } = await getQueries();
+    const agent = registerAgent("filter-agent");
+    const t1 = createTask("Assigned Task");
+    createTask("Unassigned Task");
+    assignTask(t1.id, agent.id);
+
+    const filtered = listTasks(undefined, agent.id);
+    expect(filtered.length).toBe(1);
+    expect(filtered[0].title).toBe("Assigned Task");
+  });
+});
+
+describe("updateTask", () => {
+  it("updates fields", async () => {
+    const { createTask, updateTask } = await getQueries();
+    const task = createTask("Original");
+    const updated = updateTask(task.id, { title: "Updated", priority: "high" });
+    expect(updated).not.toBeNull();
+    expect(updated!.title).toBe("Updated");
+    expect(updated!.priority).toBe("high");
+  });
+
+  it("returns null for non-existent task", async () => {
+    const { updateTask } = await getQueries();
+    expect(updateTask("bad-id", { title: "X" })).toBeNull();
+  });
+});
+
+describe("completeTask", () => {
+  it("sets status to done", async () => {
+    const { createTask, completeTask } = await getQueries();
+    const task = createTask("To Complete");
+    const done = completeTask(task.id);
+    expect(done).not.toBeNull();
+    expect(done!.status).toBe("done");
+  });
+});
+
+describe("assignTask", () => {
+  it("sets assigned_agent_id", async () => {
+    const { registerAgent, createTask, assignTask } = await getQueries();
+    const agent = registerAgent("assign-agent");
+    const task = createTask("To Assign");
+    const assigned = assignTask(task.id, agent.id);
+    expect(assigned).not.toBeNull();
+    expect(assigned!.assigned_agent_id).toBe(agent.id);
+  });
+});
+
+// --- v0.3: Workflow Template Tests ---
+
+describe("workflowTemplates", () => {
+  it("creates workflow template with steps", async () => {
+    const { createWorkflowTemplate } = await getQueries();
+    const wf = createWorkflowTemplate("Daily Review", "Review daily notes", "daily", [
+      { order: 1, tool_name: "get_daily_note", description: "Get today's note", params: {}, use_result_as: "daily" },
+      { order: 2, tool_name: "list_tasks", description: "List tasks", params: { status: "todo" } },
+    ]);
+    expect(wf.id).toBeDefined();
+    expect(wf.name).toBe("Daily Review");
+    expect(wf.steps.length).toBe(2);
+  });
+
+  it("lists workflow templates sorted by name", async () => {
+    const { createWorkflowTemplate, listWorkflowTemplates } = await getQueries();
+    createWorkflowTemplate("Zeta Flow");
+    createWorkflowTemplate("Alpha Flow");
+    const all = listWorkflowTemplates();
+    expect(all.length).toBe(2);
+    expect(all[0].name).toBe("Alpha Flow");
+  });
+
+  it("gets workflow template by id", async () => {
+    const { createWorkflowTemplate, getWorkflowTemplate } = await getQueries();
+    const wf = createWorkflowTemplate("Lookup Flow", "desc");
+    const fetched = getWorkflowTemplate(wf.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.name).toBe("Lookup Flow");
+  });
+
+  it("returns null for non-existent id", async () => {
+    const { getWorkflowTemplate } = await getQueries();
+    expect(getWorkflowTemplate("nonexistent")).toBeNull();
+  });
+
+  it("executeWorkflow runs steps and returns results", async () => {
+    const { createWorkflowTemplate, executeWorkflow } = await getQueries();
+    const wf = createWorkflowTemplate("Test Executor", "Execute test", "general", [
+      { order: 1, tool_name: "get_daily_note", description: "Get daily note", params: {}, use_result_as: "daily" },
+      { order: 2, tool_name: "append_to_note", description: "Append to daily", params: { note_id: "{{daily.id}}", content: "Workflow ran on {{date}}" } },
+    ]);
+
+    const results = executeWorkflow(wf.id);
+    expect(results.length).toBe(2);
+    expect(results[0].tool).toBe("get_daily_note");
+    expect(results[0].result).toBeDefined();
+    // Step 2 should have used the daily note id from step 1
+    expect(results[1].tool).toBe("append_to_note");
+    expect(results[1].result).toBeDefined();
+    // The result should not be an error
+    expect((results[1].result as Record<string, unknown>).error).toBeUndefined();
+  });
+});
+
+// --- v0.3: Webhook Extension Tests ---
+
+describe("updateWebhook", () => {
+  it("updates url and event_types", async () => {
+    const { registerWebhook, updateWebhook } = await getQueries();
+    const wh = registerWebhook("https://old.com/hook", ["note_created"], "secret");
+    const updated = updateWebhook(wh.id, { url: "https://new.com/hook", event_types: ["note_updated"] });
+    expect(updated).not.toBeNull();
+    expect(updated!.url).toBe("https://new.com/hook");
+    expect(updated!.event_types).toEqual(["note_updated"]);
+  });
+
+  it("toggles is_active", async () => {
+    const { registerWebhook, updateWebhook } = await getQueries();
+    const wh = registerWebhook("https://example.com/hook", [], "secret");
+    expect(wh.is_active).toBe(true);
+    const disabled = updateWebhook(wh.id, { is_active: false });
+    expect(disabled!.is_active).toBe(false);
+    const enabled = updateWebhook(wh.id, { is_active: true });
+    expect(enabled!.is_active).toBe(true);
+  });
+
+  it("returns null for non-existent webhook", async () => {
+    const { updateWebhook } = await getQueries();
+    expect(updateWebhook("bad-id", { url: "https://x.com" })).toBeNull();
+  });
+});
+
+describe("getWebhookLogs", () => {
+  it("returns empty for no logs", async () => {
+    const { registerWebhook, getWebhookLogs } = await getQueries();
+    const wh = registerWebhook("https://example.com/hook", [], "secret");
+    const logs = getWebhookLogs(wh.id);
+    expect(logs).toEqual([]);
+  });
+
+  it("returns logged entries", async () => {
+    const { registerWebhook, getWebhookLogs } = await getQueries();
+    const wh = registerWebhook("https://example.com/hook", [], "secret");
+    // Insert a log entry directly
+    testDb.prepare(
+      "INSERT INTO webhook_logs (webhook_id, event_type, payload, status_code, response_body, attempt, success, error_message, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).run(wh.id, "test", '{"test":true}', 200, "OK", 1, 1, null, new Date().toISOString());
+
+    const logs = getWebhookLogs(wh.id);
+    expect(logs.length).toBe(1);
+    expect(logs[0].event_type).toBe("test");
+    expect(logs[0].status_code).toBe(200);
+    expect(logs[0].success).toBe(1);
+  });
+});
+
+// --- v0.3: Agent-Workspace Binding Tests ---
+
+describe("agentWorkspaceBinding", () => {
+  it("creates binding", async () => {
+    const { registerAgent, createWorkspace, bindAgentWorkspace } = await getQueries();
+    const agent = registerAgent("ws-agent");
+    const ws = createWorkspace("Agent WS");
+    const binding = bindAgentWorkspace(agent.id, ws.id);
+    expect(binding.agent_id).toBe(agent.id);
+    expect(binding.workspace_id).toBe(ws.id);
+    expect(binding.role).toBe("member");
+  });
+
+  it("getAgentWorkspaces returns bound workspaces", async () => {
+    const { registerAgent, createWorkspace, bindAgentWorkspace, getAgentWorkspaces } = await getQueries();
+    const agent = registerAgent("multi-ws-agent");
+    const ws1 = createWorkspace("WS One");
+    const ws2 = createWorkspace("WS Two");
+    bindAgentWorkspace(agent.id, ws1.id);
+    bindAgentWorkspace(agent.id, ws2.id, "admin");
+
+    const workspaces = getAgentWorkspaces(agent.id);
+    expect(workspaces.length).toBe(2);
+  });
+
+  it("duplicate binding is idempotent", async () => {
+    const { registerAgent, createWorkspace, bindAgentWorkspace, getAgentWorkspaces } = await getQueries();
+    const agent = registerAgent("dup-agent");
+    const ws = createWorkspace("Dup WS");
+    bindAgentWorkspace(agent.id, ws.id);
+    bindAgentWorkspace(agent.id, ws.id); // duplicate
+
+    const workspaces = getAgentWorkspaces(agent.id);
+    expect(workspaces.length).toBe(1);
+  });
+
+  it("returns empty for unbound agent", async () => {
+    const { registerAgent, getAgentWorkspaces } = await getQueries();
+    const agent = registerAgent("lonely-agent");
+    const workspaces = getAgentWorkspaces(agent.id);
+    expect(workspaces).toEqual([]);
+  });
+});

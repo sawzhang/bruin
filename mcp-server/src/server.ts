@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces } from "./db/queries.js";
+import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, executeWorkflow, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces } from "./db/queries.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -679,18 +679,17 @@ export function createServer(): McpServer {
 
   server.tool(
     "execute_workflow",
-    "Execute a workflow template. Returns the steps with their results for the agent to follow.",
+    "Execute a workflow template server-side. Each step is run automatically with result chaining between steps.",
     {
       id: z.string().describe("Workflow template ID to execute"),
     },
     async (args) => {
-      const workflow = getWorkflowTemplate(args.id);
-      if (!workflow) return error(`Workflow template '${args.id}' not found`);
-      return text({
-        message: `Workflow '${workflow.name}' loaded with ${workflow.steps.length} steps. Execute each step in order using the specified tools.`,
-        workflow: workflow.name,
-        steps: workflow.steps,
-      });
+      try {
+        const results = executeWorkflow(args.id);
+        return text({ steps: results });
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
     }
   );
 
