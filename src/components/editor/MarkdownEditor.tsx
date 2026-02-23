@@ -23,8 +23,8 @@ import { WikiLink } from "./extensions/WikiLink";
 import { SlashCommand, slashCommands } from "./extensions/SlashCommand";
 import { SlashCommandMenu } from "./SlashCommandMenu";
 import * as tauri from "../../lib/tauri";
-import "../styles/code-highlight.css";
-import "../styles/editor.css";
+import "../../styles/code-highlight.css";
+import "../../styles/editor.css";
 
 interface MarkdownEditorProps {
   content: string;
