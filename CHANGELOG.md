@@ -5,6 +5,21 @@ All notable changes to Bruin will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-02-25
+
+### Added
+- 13 new MCP tools (47 → 60): get_agent, update_agent, deactivate_agent, delete_workspace, unbind_agent_workspace, delete_workflow_template, pin_note, restore_note, get_setting, set_setting, get_all_settings, export_note_markdown, export_note_html
+- Export notes as markdown with YAML frontmatter or standalone HTML
+- Pin/unpin notes and restore from trash via MCP
+- Settings KV store accessible via MCP tools
+- npm publish support: `npx bruin-mcp-server` for easy agent setup
+- Landing page SEO: JSON-LD structured data, sitemap.xml, robots.txt, canonical URL, meta keywords
+
+### Changed
+- Rewrote README with CI badges, 60-tool breakdown, architecture diagram, and npx setup instructions
+- Inline SVG colors now use CSS variables for proper light mode adaptation
+- Updated meta description to reflect expanded tool count
+
 ## [0.3.0] - 2026-02-22
 
 ### Added
