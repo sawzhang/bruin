@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bruin - Agent-Native Markdown Notes</title>
   <meta name="description" content="A beautiful markdown note-taking app built for AI agents and loved by humans. MCP-first design, knowledge graph, semantic search." />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Bruin - Agent-Native Markdown Notes" />
+  <meta property="og:description" content="A local-first markdown note app where AI agents read, write, and organize your knowledge through MCP — while you stay in control." />
+  <meta property="og:image" content="https://sawzhang.github.io/bruin/favicon-32x32.png" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Bruin - Agent-Native Markdown Notes" />
+  <meta name="twitter:description" content="A local-first markdown note app where AI agents read, write, and organize your knowledge through MCP." />
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
@@ -37,7 +46,7 @@
 
   <!-- ==================== HERO ==================== -->
   <section class="hero">
-    <div class="hero-badge">Agent-Native &middot; Open Source &middot; Local-First</div>
+    <div class="hero-badge">Agent-Native &middot; Open Source &middot; Local-First &middot; v0.3</div>
     <h1 class="hero-title">
       Your second brain,<br/><span class="hero-accent">powered by agents</span>
     </h1>
@@ -136,7 +145,7 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
           </div>
           <h3>Agent-Native</h3>
-          <p>Built from day one for AI agents. MCP server with 14 tools gives agents the same power as the GUI.</p>
+          <p>Built from day one for AI agents. MCP server with 47 tools gives agents the same power as the GUI.</p>
         </div>
         <div class="philosophy-card">
           <div class="philosophy-icon">
@@ -168,17 +177,17 @@
           <p>
             Bruin ships with a full Model Context Protocol server.
             Claude, GPT, and any MCP-compatible agent can create notes,
-            search semantically, traverse the knowledge graph, and manage
-            workspaces &mdash; no GUI required.
+            search semantically, traverse the knowledge graph, manage agents,
+            tasks, workflows, and workspaces &mdash; no GUI required.
           </p>
           <div class="feature-highlights">
             <div class="feature-highlight">
-              <span class="feature-number">14</span>
+              <span class="feature-number">47</span>
               <span>MCP tools</span>
             </div>
             <div class="feature-highlight">
-              <span class="feature-number">3</span>
-              <span>Agent tiers</span>
+              <span class="feature-number">6</span>
+              <span>Tool categories</span>
             </div>
             <div class="feature-highlight">
               <span class="feature-number">0</span>
@@ -385,8 +394,33 @@
     </div>
   </section>
 
-  <!-- ==================== MORE FEATURES ==================== -->
+  <!-- ==================== V0.3 FEATURES ==================== -->
   <section class="more-features">
+    <div class="container">
+      <div class="feature-label" style="text-align:center;">New in v0.3</div>
+      <h2 style="text-align:center; font-size:36px; font-weight:700; letter-spacing:-0.03em; margin-bottom:48px;">Agent superpowers</h2>
+      <div class="more-grid">
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
+          <h4>Agent Registry</h4>
+          <p>First-class agent identity. Register, track, and audit every agent that touches your knowledge base.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <h4>Task Management</h4>
+          <p>Create, assign, and track tasks linked to notes and agents. Priority indicators with quick-complete.</p>
+        </div>
+        <div class="more-card">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+          <h4>Workflow Templates</h4>
+          <p>Multi-step agent workflows with variable interpolation. Daily Standup, Research Summary, and more.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MORE FEATURES ==================== -->
+  <section class="more-features" style="border-top: 1px solid var(--border);">
     <div class="container">
       <h2>And so much more</h2>
       <div class="more-grid">
@@ -402,8 +436,8 @@
         </div>
         <div class="more-card">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          <h4>Webhooks</h4>
-          <p>HMAC-signed HTTP callbacks on note events with exponential retry.</p>
+          <h4>Webhook Management</h4>
+          <p>Visual webhook registration, testing, delivery logs, and HMAC-signed callbacks with retry.</p>
         </div>
         <div class="more-card">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -429,9 +463,9 @@
     <div class="container">
       <div class="mcp-header">
         <div class="feature-label">Model Context Protocol</div>
-        <h2>Every agent tool, documented</h2>
+        <h2>47 tools, 6 categories</h2>
         <p class="mcp-intro">
-          Bruin's MCP server exposes 14 tools across three tiers.
+          Bruin's MCP server exposes 47 tools across six categories.
           Install it alongside Claude Code, Cursor, or any MCP-compatible client.
         </p>
       </div>
@@ -439,8 +473,8 @@
       <div class="mcp-tiers">
         <div class="mcp-tier">
           <div class="mcp-tier-header">
-            <h3>Core</h3>
-            <span class="mcp-tier-badge">8 tools</span>
+            <h3>Notes &amp; Search</h3>
+            <span class="mcp-tier-badge">14 tools</span>
           </div>
           <div class="mcp-tool-list">
             <div class="mcp-tool">
@@ -448,61 +482,114 @@
               <span>Create with title, content, tags, workspace</span>
             </div>
             <div class="mcp-tool">
-              <code>read_note</code>
-              <span>Fetch full note by ID</span>
+              <code>read_note / update_note / delete_note</code>
+              <span>Full CRUD with optimistic locking</span>
             </div>
             <div class="mcp-tool">
-              <code>update_note</code>
-              <span>Partial or full content update</span>
+              <code>batch_create_notes</code>
+              <span>Atomic creation of multiple notes</span>
             </div>
             <div class="mcp-tool">
-              <code>delete_note</code>
-              <span>Soft-delete to trash or permanent</span>
+              <code>search_notes / semantic_search</code>
+              <span>FTS5 + vector similarity search</span>
             </div>
             <div class="mcp-tool">
-              <code>list_notes</code>
-              <span>Paginated listing with filters</span>
+              <code>advanced_query</code>
+              <span>Tags AND/OR, dates, word count, FTS</span>
             </div>
             <div class="mcp-tool">
-              <code>search_notes</code>
-              <span>Full-text search with FTS5</span>
-            </div>
-            <div class="mcp-tool">
-              <code>list_tags</code>
-              <span>All tags with note counts</span>
-            </div>
-            <div class="mcp-tool">
-              <code>get_note_by_title</code>
-              <span>Lookup by exact title match</span>
+              <code>get_backlinks</code>
+              <span>Query knowledge graph connections</span>
             </div>
           </div>
         </div>
 
         <div class="mcp-tier">
           <div class="mcp-tier-header">
-            <h3>Agent-Enhanced</h3>
-            <span class="mcp-tier-badge accent">5 tools</span>
+            <h3>Agent Registry</h3>
+            <span class="mcp-tier-badge accent">4 tools</span>
           </div>
           <div class="mcp-tool-list">
             <div class="mcp-tool">
-              <code>batch_create_notes</code>
-              <span>Atomic creation of multiple notes</span>
+              <code>register_agent</code>
+              <span>Register agent with capabilities &amp; metadata</span>
             </div>
             <div class="mcp-tool">
-              <code>append_to_note</code>
-              <span>Incremental writes, not full replace</span>
+              <code>list_agents</code>
+              <span>View all registered agents and status</span>
             </div>
             <div class="mcp-tool">
-              <code>get_backlinks</code>
-              <span>Query knowledge graph connections</span>
+              <code>update_agent</code>
+              <span>Modify agent config and capabilities</span>
             </div>
             <div class="mcp-tool">
-              <code>get_daily_note</code>
-              <span>Idempotent access to today's note</span>
+              <code>deactivate_agent</code>
+              <span>Disable agent access gracefully</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mcp-tier">
+          <div class="mcp-tier-header">
+            <h3>Tasks &amp; Workflows</h3>
+            <span class="mcp-tier-badge accent">9 tools</span>
+          </div>
+          <div class="mcp-tool-list">
+            <div class="mcp-tool">
+              <code>create_task / complete_task</code>
+              <span>Task lifecycle linked to notes &amp; agents</span>
             </div>
             <div class="mcp-tool">
-              <code>advanced_query</code>
-              <span>Tags AND/OR, dates, word count, FTS</span>
+              <code>list_tasks / assign_task</code>
+              <span>Filter, prioritize, and delegate to agents</span>
+            </div>
+            <div class="mcp-tool">
+              <code>create_workflow / run_workflow</code>
+              <span>Multi-step agent workflow templates</span>
+            </div>
+            <div class="mcp-tool">
+              <code>list_workflows</code>
+              <span>Browse available workflow definitions</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mcp-tiers" style="margin-top: 24px;">
+        <div class="mcp-tier">
+          <div class="mcp-tier-header">
+            <h3>Webhooks</h3>
+            <span class="mcp-tier-badge">3 tools</span>
+          </div>
+          <div class="mcp-tool-list">
+            <div class="mcp-tool">
+              <code>register_webhook</code>
+              <span>Subscribe to note events with HMAC signing</span>
+            </div>
+            <div class="mcp-tool">
+              <code>list_webhooks / test_webhook</code>
+              <span>Manage and verify connectivity</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mcp-tier">
+          <div class="mcp-tier-header">
+            <h3>Workspaces &amp; Tags</h3>
+            <span class="mcp-tier-badge">6 tools</span>
+          </div>
+          <div class="mcp-tool-list">
+            <div class="mcp-tool">
+              <code>list_workspaces / create_workspace</code>
+              <span>Organize notes into separate spaces</span>
+            </div>
+            <div class="mcp-tool">
+              <code>bind_agent_workspace</code>
+              <span>Scope agent access to workspaces</span>
+            </div>
+            <div class="mcp-tool">
+              <code>list_tags / manage_tags</code>
+              <span>Hierarchical tag management</span>
             </div>
           </div>
         </div>
@@ -510,12 +597,20 @@
         <div class="mcp-tier">
           <div class="mcp-tier-header">
             <h3>Utilities</h3>
-            <span class="mcp-tier-badge">1 tool</span>
+            <span class="mcp-tier-badge">11 tools</span>
           </div>
           <div class="mcp-tool-list">
             <div class="mcp-tool">
-              <code>import_markdown</code>
-              <span>Import .md files with frontmatter parsing</span>
+              <code>import_markdown / export_note</code>
+              <span>Import .md with frontmatter, export to formats</span>
+            </div>
+            <div class="mcp-tool">
+              <code>get_daily_note / list_templates</code>
+              <span>Quick-start templates and daily journals</span>
+            </div>
+            <div class="mcp-tool">
+              <code>get_activity / get_stats</code>
+              <span>Activity feed and usage analytics</span>
             </div>
           </div>
         </div>
@@ -622,7 +717,7 @@
   <section id="download" class="download">
     <div class="container">
       <h2>Get Bruin</h2>
-      <p>Free and open source. Download for macOS (Apple Silicon &amp; Intel) or build from source.</p>
+      <p>Free and open source, v0.3.0. Download for macOS (Apple Silicon &amp; Intel) or build from source.</p>
       <div class="download-actions">
         <a href="https://github.com/sawzhang/bruin/releases/latest" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
