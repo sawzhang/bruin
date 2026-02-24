@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, executeWorkflow, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces } from "./db/queries.js";
+import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, executeWorkflow, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces, unbindAgentWorkspace, updateAgent, deactivateAgent, deleteWorkflowTemplate, pinNote, restoreNote, getSetting, setSetting, getAllSettings, exportNoteMarkdown, exportNoteHtml } from "./db/queries.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -795,6 +795,181 @@ export function createServer(): McpServer {
     async (args) => {
       const workspaces = getAgentWorkspaces(args.agent_id);
       return text(workspaces);
+    }
+  );
+
+  // --- v0.4: Fill coverage gaps ---
+
+  server.tool(
+    "get_agent",
+    "Get a single agent by ID with capabilities and status",
+    {
+      id: z.string().describe("Agent ID"),
+    },
+    async (args) => {
+      const agent = getAgent(args.id);
+      if (!agent) return error(`Agent '${args.id}' not found`);
+      return text(agent);
+    }
+  );
+
+  server.tool(
+    "update_agent",
+    "Update an agent's name, description, or capabilities",
+    {
+      id: z.string().describe("Agent ID to update"),
+      name: z.string().optional().describe("New name"),
+      description: z.string().optional().describe("New description"),
+      capabilities: z.array(z.string()).optional().describe("New capabilities list"),
+    },
+    async (args) => {
+      const { id, ...updates } = args;
+      const agent = updateAgent(id, updates);
+      if (!agent) return error(`Agent '${id}' not found`);
+      return text(agent);
+    }
+  );
+
+  server.tool(
+    "deactivate_agent",
+    "Deactivate an agent, preventing it from performing further actions",
+    {
+      id: z.string().describe("Agent ID to deactivate"),
+    },
+    async (args) => {
+      const agent = deactivateAgent(args.id);
+      if (!agent) return error(`Agent '${args.id}' not found`);
+      return text(agent);
+    }
+  );
+
+  server.tool(
+    "delete_workspace",
+    "Delete a workspace by ID",
+    {
+      id: z.string().describe("Workspace ID to delete"),
+    },
+    async (args) => {
+      const result = deleteWorkspace(args.id);
+      if (!result.success) return error(result.message);
+      return text(result);
+    }
+  );
+
+  server.tool(
+    "unbind_agent_workspace",
+    "Remove an agent's access to a workspace",
+    {
+      agent_id: z.string().describe("Agent ID"),
+      workspace_id: z.string().describe("Workspace ID"),
+    },
+    async (args) => {
+      const result = unbindAgentWorkspace(args.agent_id, args.workspace_id);
+      if (!result.success) return error(result.message);
+      return text(result);
+    }
+  );
+
+  server.tool(
+    "delete_workflow_template",
+    "Delete a workflow template by ID",
+    {
+      id: z.string().describe("Workflow template ID to delete"),
+    },
+    async (args) => {
+      const result = deleteWorkflowTemplate(args.id);
+      if (!result.success) return error(result.message);
+      return text(result);
+    }
+  );
+
+  server.tool(
+    "pin_note",
+    "Pin or unpin a note. Pinned notes appear at the top of lists.",
+    {
+      id: z.string().describe("Note ID"),
+      pinned: z.boolean().describe("True to pin, false to unpin"),
+    },
+    async (args) => {
+      const note = pinNote(args.id, args.pinned);
+      if (!note) return error(`Note '${args.id}' not found`);
+      notifyNoteChanged(args.id);
+      return text(note);
+    }
+  );
+
+  server.tool(
+    "restore_note",
+    "Restore a note from trash",
+    {
+      id: z.string().describe("Note ID to restore"),
+    },
+    async (args) => {
+      const note = restoreNote(args.id);
+      if (!note) return error(`Trashed note '${args.id}' not found`);
+      notifyNotesListChanged();
+      return text(note);
+    }
+  );
+
+  server.tool(
+    "get_setting",
+    "Get a setting value by key",
+    {
+      key: z.string().describe("Setting key"),
+    },
+    async (args) => {
+      const value = getSetting(args.key);
+      return text({ key: args.key, value });
+    }
+  );
+
+  server.tool(
+    "set_setting",
+    "Set a setting value",
+    {
+      key: z.string().describe("Setting key"),
+      value: z.string().describe("Setting value"),
+    },
+    async (args) => {
+      setSetting(args.key, args.value);
+      return text({ key: args.key, value: args.value, message: "Setting saved" });
+    }
+  );
+
+  server.tool(
+    "get_all_settings",
+    "Get all settings as key-value pairs",
+    {},
+    async () => {
+      const settings = getAllSettings();
+      return text(settings);
+    }
+  );
+
+  server.tool(
+    "export_note_markdown",
+    "Export a note as markdown with YAML frontmatter (title, dates, state, tags)",
+    {
+      id: z.string().describe("Note ID to export"),
+    },
+    async (args) => {
+      const md = exportNoteMarkdown(args.id);
+      if (!md) return error(`Note '${args.id}' not found`);
+      return { content: [{ type: "text" as const, text: md }] };
+    }
+  );
+
+  server.tool(
+    "export_note_html",
+    "Export a note as a standalone HTML document",
+    {
+      id: z.string().describe("Note ID to export"),
+    },
+    async (args) => {
+      const html = exportNoteHtml(args.id);
+      if (!html) return error(`Note '${args.id}' not found`);
+      return { content: [{ type: "text" as const, text: html }] };
     }
   );
 

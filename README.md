@@ -1,33 +1,40 @@
 # Bruin
 
-An agent-native markdown note-taking app. AI agents read, write, and organize your knowledge through [MCP](https://modelcontextprotocol.io) — while you stay in control with human-in-the-loop review.
+[![CI](https://github.com/sawzhang/bruin/actions/workflows/ci.yml/badge.svg)](https://github.com/sawzhang/bruin/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Built with Tauri 2 + Rust + React 19.
+Agent-native markdown notes. AI agents read, write, and organize your knowledge through [MCP](https://modelcontextprotocol.io) — while you stay in control with human-in-the-loop review.
 
-## Features
-
-- **MCP Server** — 14 tools across 3 tiers. Agents get the same power as the GUI: create, search, link, and organize notes.
-- **Knowledge Graph** — `[[Wiki-links]]` with bidirectional backlinks and D3 force-directed visualization.
-- **Semantic Search** — Local embeddings via Hugging Face Transformers. Your data never leaves your machine.
-- **Review Workflow** — Notes flow through `draft → review → published`. Agents write, humans approve.
-- **iCloud Sync** — Bidirectional sync with SHA-256 hash comparison and conflict resolution.
-- **Full-Text Search** — SQLite FTS5 for instant keyword search alongside semantic results.
-- **Hierarchical Tags** — Nested tags like `#project/bruin/v2` with tree navigation.
-- **Workspaces** — Separate spaces for personal notes, agent output, and projects.
-- **Webhooks** — HMAC-signed HTTP callbacks on note events.
-- **6 Themes** — Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more.
-
-## Download
-
-Grab the latest `.dmg` from [GitHub Releases](https://github.com/sawzhang/bruin/releases/latest) (Apple Silicon & Intel).
+**[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[Website](https://sawzhang.github.io/bruin/)**
 
 > If macOS shows "app is damaged", run: `xattr -cr /Applications/Bruin.app`
 
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+## Why Bruin
 
-## MCP Server Setup
+Most note apps bolt on AI as an afterthought. Bruin is built from day one for AI agents:
 
-Add to your `claude_desktop_config.json`:
+- **MCP-first** — 60 tools let any MCP-compatible agent (Claude, GPT, custom) do everything the GUI can
+- **Human-reviewed** — Notes flow through `draft → review → published`. Agents write, humans approve
+- **Local-first** — SQLite + iCloud sync. Your data never leaves your machine
+- **Knowledge graph** — `[[wiki-links]]` create a force-directed graph of connected ideas
+
+## Features
+
+| Area | What you get |
+|------|--------------|
+| **Editor** | TipTap markdown with syntax highlighting, tables, images, slash commands |
+| **Search** | FTS5 full-text + semantic search with local Hugging Face embeddings |
+| **Knowledge Graph** | D3 force-directed visualization, backlinks, BFS traversal |
+| **Agent Registry** | Register, track, and audit every agent that touches your notes |
+| **Task Management** | Create, assign, and track tasks linked to notes and agents |
+| **Workflow Templates** | Multi-step agent automation with variable interpolation |
+| **Webhooks** | HMAC-SHA256 signed callbacks with delivery logs and retry |
+| **iCloud Sync** | Bidirectional sync with SHA-256 conflict resolution |
+| **6 Themes** | Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more |
+
+## MCP Server
+
+Add to your agent's config (Claude Desktop, Claude Code, Cursor, etc.):
 
 ```json
 {
@@ -40,115 +47,94 @@ Add to your `claude_desktop_config.json`:
 }
 ```
 
-### Available Tools
+Or run from a local clone:
 
-| Tier | Tool | Description |
-|------|------|-------------|
-| Core | `create_note` | Create with title, content, tags, workspace |
-| Core | `read_note` | Fetch full note by ID |
-| Core | `update_note` | Partial or full content update |
-| Core | `delete_note` | Soft-delete to trash or permanent |
-| Core | `list_notes` | Paginated listing with filters |
-| Core | `search_notes` | Full-text search with FTS5 |
-| Core | `list_tags` | All tags with note counts |
-| Core | `get_note_by_title` | Lookup by exact title match |
-| Agent | `batch_create_notes` | Atomic creation of multiple notes |
-| Agent | `append_to_note` | Incremental writes, not full replace |
-| Agent | `get_backlinks` | Query knowledge graph connections |
-| Agent | `get_daily_note` | Idempotent access to today's note |
-| Agent | `advanced_query` | Tags AND/OR, dates, word count, FTS |
-| Utility | `import_markdown` | Import .md files with frontmatter parsing |
+```json
+{
+  "mcpServers": {
+    "bruin": {
+      "command": "node",
+      "args": ["<path-to-bruin>/mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+60 tools across 6 categories:
+
+| Category | Count | Key tools |
+|----------|-------|-----------|
+| Notes & Search | 16 | `create_note`, `search_notes`, `semantic_search`, `advanced_query`, `get_backlinks` |
+| Agent Registry | 6 | `register_agent`, `update_agent`, `deactivate_agent`, `get_agent_audit_log` |
+| Tasks & Workflows | 10 | `create_task`, `assign_task`, `execute_workflow`, `create_workflow_template` |
+| Webhooks | 5 | `register_webhook`, `test_webhook`, `get_webhook_logs` |
+| Workspaces & Tags | 8 | `create_workspace`, `bind_agent_workspace`, `list_tags`, `switch_workspace` |
+| Utilities & Export | 15 | `import_markdown`, `export_note_html`, `pin_note`, `get_setting`, `get_daily_note` |
+
+4 MCP resources: `bruin://notes`, `bruin://notes/{noteId}`, `bruin://tags`, `bruin://daily`
+
+## Architecture
+
+```
+AI Agent ──MCP (stdio)──► MCP Server (Node.js) ──► SQLite ◄── Rust Backend ◄──IPC──► React Frontend
+                                                      │
+                                                 iCloud Sync
+                                              (bidirectional .md files)
+```
+
+All three processes share the same SQLite database. The MCP server notifies the Tauri app of changes via a trigger file that the file watcher detects.
+
+| Layer | Technology |
+|-------|-----------|
+| Desktop Shell | Tauri 2 |
+| Backend | Rust, SQLite (WAL + FTS5), rusqlite |
+| Frontend | React 19, TipTap, Zustand, D3 |
+| Agent Protocol | MCP SDK (TypeScript) |
+| Embeddings | @huggingface/transformers (all-MiniLM-L6-v2) |
+| Sync | iCloud Drive + notify file watcher |
 
 ## Development
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) 20+
-- [Rust](https://rustup.rs/) (stable)
-- [Tauri CLI](https://tauri.app/) (`npm install -g @tauri-apps/cli`)
+- Node.js 18+
+- Rust (stable) via [rustup](https://rustup.rs/)
+- Xcode Command Line Tools
 
 ### Setup
 
 ```bash
-# Install frontend dependencies
 npm install
-
-# Install MCP server dependencies
 cd mcp-server && npm install && cd ..
-
-# Start in dev mode
-npm run tauri dev
+npm run tauri dev          # Vite + Tauri hot reload
 ```
 
 ### Build
 
 ```bash
-npm run tauri build
+npm run tauri build        # → .dmg in src-tauri/target/release/bundle/
 ```
-
-Output: `src-tauri/target/release/bundle/`
 
 ### Tests
 
 ```bash
-# Frontend tests
-npm test
-
-# MCP server tests
-cd mcp-server && npm test
+npm test                                # Frontend (Vitest)
+cd mcp-server && npm test               # MCP server (96 tests)
+cd src-tauri && cargo check             # Rust type check
+cd src-tauri && cargo clippy            # Rust lint
 ```
 
-## Architecture
+## Releasing
 
-```
-┌─────────────┐     MCP Protocol     ┌─────────────┐     GUI / Editor     ┌─────────────┐
-│  AI Agent   │ ◄──────────────────► │  Bruin App  │ ◄──────────────────► │    Human    │
-│ Claude, GPT │                      │ Tauri + Rust│                      │   Review &  │
-│   custom    │                      │  + React    │                      │   Publish   │
-└─────────────┘                      └──────┬──────┘                      └─────────────┘
-                                            │
-                                    ┌───────┴───────┐
-                                    │    SQLite     │
-                                    │ FTS5 + Graph  │
-                                    │  Embeddings   │
-                                    └───────┬───────┘
-                                            │
-                                     iCloud Sync
-                                     Webhooks
-                                     File Watcher
-```
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Desktop Shell | Tauri 2 |
-| Backend | Rust, SQLite (rusqlite), FTS5 |
-| Frontend | React 19, Tiptap, Zustand, D3 |
-| Agent Protocol | MCP SDK (TypeScript) |
-| Embeddings | @huggingface/transformers |
-| Sync | iCloud Drive + notify file watcher |
-
-## Release
-
-Releases are fully automated via GitHub Actions. To publish a new version:
+Version is tracked in three files (keep in sync): `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`.
 
 ```bash
-# 1. Update version in all three files:
-#    - package.json
-#    - src-tauri/Cargo.toml
-#    - src-tauri/tauri.conf.json
-
-# 2. Update CHANGELOG.md
-
-# 3. Commit, tag, and push
-git add -A && git commit -m "Release v0.2.0"
-git tag v0.2.0
+git tag v0.4.0
 git push origin master --tags
 ```
 
-GitHub Actions will build `.dmg` for Apple Silicon and Intel, then publish the release automatically.
+GitHub Actions builds `.dmg` for Apple Silicon and Intel, then auto-publishes to Releases. See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## License
 
-MIT
+[MIT](LICENSE)

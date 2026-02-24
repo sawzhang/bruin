@@ -1500,6 +1500,141 @@ export function getAgentWorkspaces(agentId: string): AgentWorkspaceRow[] {
   ).all(agentId) as AgentWorkspaceRow[];
 }
 
+export function unbindAgentWorkspace(agentId: string, workspaceId: string): { success: boolean; message: string } {
+  const existing = db.prepare(
+    "SELECT agent_id FROM agent_workspaces WHERE agent_id = ? AND workspace_id = ?"
+  ).get(agentId, workspaceId);
+  if (!existing) {
+    return { success: false, message: `Binding not found for agent '${agentId}' in workspace '${workspaceId}'` };
+  }
+  db.prepare("DELETE FROM agent_workspaces WHERE agent_id = ? AND workspace_id = ?").run(agentId, workspaceId);
+  return { success: true, message: `Unbound agent '${agentId}' from workspace '${workspaceId}'` };
+}
+
+// --- Agent update & deactivate ---
+
+export function updateAgent(
+  id: string,
+  updates: { name?: string; description?: string; capabilities?: string[] }
+): AgentWithCaps | null {
+  const row = db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as AgentRow | undefined;
+  if (!row) return null;
+  const existing = parseAgent(row);
+
+  const name = updates.name ?? existing.name;
+  const description = updates.description ?? existing.description;
+  const capabilities = updates.capabilities ?? existing.capabilities;
+  const timestamp = now();
+
+  db.prepare(
+    "UPDATE agents SET name = ?, description = ?, capabilities = ?, updated_at = ? WHERE id = ?"
+  ).run(name, description, JSON.stringify(capabilities), timestamp, id);
+
+  return getAgent(id);
+}
+
+export function deactivateAgent(id: string): AgentWithCaps | null {
+  const row = db.prepare("SELECT * FROM agents WHERE id = ?").get(id) as AgentRow | undefined;
+  if (!row) return null;
+  const timestamp = now();
+  db.prepare("UPDATE agents SET is_active = 0, updated_at = ? WHERE id = ?").run(timestamp, id);
+  logActivity("agent", "agent_deactivated", null, `Deactivated agent '${row.name}'`);
+  return getAgent(id);
+}
+
+// --- Workflow delete ---
+
+export function deleteWorkflowTemplate(id: string): { success: boolean; message: string } {
+  const existing = db.prepare("SELECT id FROM workflow_templates WHERE id = ?").get(id);
+  if (!existing) {
+    return { success: false, message: `Workflow template '${id}' not found` };
+  }
+  db.prepare("DELETE FROM workflow_templates WHERE id = ?").run(id);
+  return { success: true, message: `Workflow template '${id}' deleted` };
+}
+
+// --- Note pin/unpin ---
+
+export function pinNote(id: string, isPinned: boolean): NoteWithTags | null {
+  const existing = db.prepare("SELECT id FROM notes WHERE id = ?").get(id) as { id: string } | undefined;
+  if (!existing) return null;
+  const timestamp = now();
+  db.prepare("UPDATE notes SET is_pinned = ?, updated_at = ? WHERE id = ?").run(isPinned ? 1 : 0, timestamp, id);
+  logActivity("agent", isPinned ? "note_pinned" : "note_unpinned", id, isPinned ? "Pinned note" : "Unpinned note");
+  notifyTauri();
+  return getNote(id);
+}
+
+// --- Note restore from trash ---
+
+export function restoreNote(id: string): NoteWithTags | null {
+  const existing = db.prepare("SELECT * FROM notes WHERE id = ? AND is_trashed = 1").get(id) as NoteRow | undefined;
+  if (!existing) return null;
+  const timestamp = now();
+  db.prepare("UPDATE notes SET is_trashed = 0, updated_at = ? WHERE id = ?").run(timestamp, id);
+  logActivity("agent", "note_restored", id, `Restored note '${existing.title}' from trash`);
+  notifyTauri();
+  return getNote(id);
+}
+
+// --- Settings KV store ---
+
+export function getSetting(key: string): string | null {
+  const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | undefined;
+  return row?.value ?? null;
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?"
+  ).run(key, value, value);
+}
+
+export function getAllSettings(): Array<{ key: string; value: string }> {
+  return db.prepare("SELECT key, value FROM settings ORDER BY key").all() as Array<{ key: string; value: string }>;
+}
+
+// --- Export ---
+
+export function exportNoteMarkdown(id: string): string | null {
+  const note = getNote(id);
+  if (!note) return null;
+
+  const frontmatter = [
+    "---",
+    `title: "${note.title.replace(/"/g, '\\"')}"`,
+    `created: ${note.created_at}`,
+    `updated: ${note.updated_at}`,
+    `state: ${note.state}`,
+    note.tags.length > 0 ? `tags: [${note.tags.map(t => `"${t}"`).join(", ")}]` : null,
+    note.workspace_id ? `workspace: ${note.workspace_id}` : null,
+    "---",
+  ].filter(Boolean).join("\n");
+
+  return `${frontmatter}\n\n${note.content}`;
+}
+
+export function exportNoteHtml(id: string): string | null {
+  const note = getNote(id);
+  if (!note) return null;
+
+  // Basic markdown-to-HTML: headings, bold, italic, code, links, paragraphs
+  let html = note.content
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code>$1</code>")
+    .replace(/\[\[(.+?)\]\]/g, '<a class="wiki-link">$1</a>')
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br>");
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${note.title}</title></head>
+<body><h1>${note.title}</h1><p>${html}</p></body></html>`;
+}
+
 // --- Workflow Executor ---
 
 export interface WorkflowStepResult {

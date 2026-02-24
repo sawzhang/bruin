@@ -1,11 +1,37 @@
 {
   "name": "bruin-mcp-server",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.4.0",
+  "description": "MCP server for Bruin — agent-native markdown notes. 60 tools for note CRUD, semantic search, knowledge graph, agent registry, task management, and more.",
   "type": "module",
+  "bin": {
+    "bruin-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "notes",
+    "markdown",
+    "ai-agent",
+    "knowledge-graph",
+    "semantic-search",
+    "sqlite"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sawzhang/bruin.git",
+    "directory": "mcp-server"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:watch": "vitest"
   },
