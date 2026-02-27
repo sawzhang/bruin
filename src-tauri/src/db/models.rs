@@ -38,6 +38,7 @@ pub struct Tag {
     pub name: String,
     pub parent_name: Option<String>,
     pub note_count: i64,
+    pub is_pinned: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

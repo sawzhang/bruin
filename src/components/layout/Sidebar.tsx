@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import clsx from "clsx";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
@@ -7,11 +7,14 @@ import { useNotes } from "../../hooks/useNotes";
 import { useUIStore } from "../../stores/uiStore";
 import { TagTree } from "../sidebar/TagTree";
 import { WorkspaceSelector } from "../sidebar/WorkspaceSelector";
+import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { importMarkdownFiles, getSyncStatus } from "../../lib/tauri";
 import type { SyncState } from "../../types/sync";
+import type { TagTreeNode } from "../../types/tag";
 
 export function Sidebar() {
-  const { tagTree, selectedTags, selectTag, toggleTag, clearTags } = useTags();
+  const { tagTree, selectedTags, selectTag, toggleTag, clearTags, pinTag, renameTag, deleteTag } = useTags();
   const { createNote, showTrash, setShowTrash, loadNotes } = useNotes();
   const toggleThemePicker = useUIStore((s) => s.toggleThemePicker);
   const toggleActivityPanel = useUIStore((s) => s.toggleActivityPanel);
@@ -99,6 +102,84 @@ export function Sidebar() {
       await importMarkdownFiles(paths);
       loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
     }
+  };
+
+  // Tag context menu state
+  const [tagContextMenu, setTagContextMenu] = useState<{
+    x: number;
+    y: number;
+    node: TagTreeNode;
+  } | null>(null);
+
+  // Rename dialog state
+  const [renameDialog, setRenameDialog] = useState<{
+    oldName: string;
+    fullPath: string;
+  } | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Confirm delete dialog state
+  const [confirmDelete, setConfirmDelete] = useState<{
+    name: string;
+    noteCount: number;
+  } | null>(null);
+
+  const handleTagContextMenu = useCallback((e: React.MouseEvent, node: TagTreeNode) => {
+    e.preventDefault();
+    setTagContextMenu({ x: e.clientX, y: e.clientY, node });
+  }, []);
+
+  const tagContextMenuItems: ContextMenuItem[] = tagContextMenu ? [
+    {
+      label: tagContextMenu.node.isPinned ? "Unpin Tag" : "Pin Tag",
+      icon: tagContextMenu.node.isPinned ? "\u25CB" : "\u{1F4CC}",
+      action: () => {
+        pinTag(tagContextMenu.node.fullPath, !tagContextMenu.node.isPinned);
+      },
+    },
+    {
+      label: "Rename Tag",
+      icon: "\u270E",
+      action: () => {
+        setRenameDialog({ oldName: tagContextMenu.node.name, fullPath: tagContextMenu.node.fullPath });
+        setRenameValue(tagContextMenu.node.name);
+        setTimeout(() => renameInputRef.current?.focus(), 50);
+      },
+    },
+    {
+      label: "Delete Tag",
+      icon: "\u{1F5D1}",
+      action: () => {
+        setConfirmDelete({
+          name: tagContextMenu.node.fullPath,
+          noteCount: tagContextMenu.node.noteCount,
+        });
+      },
+      variant: "danger" as const,
+      separator: true,
+    },
+  ] : [];
+
+  const handleRenameSubmit = async () => {
+    if (!renameDialog || !renameValue.trim()) return;
+    const oldFull = renameDialog.fullPath;
+    // Build new full path: replace the last segment
+    const parts = oldFull.split("/");
+    parts[parts.length - 1] = renameValue.trim();
+    const newFull = parts.join("/");
+    if (newFull !== oldFull) {
+      await renameTag(oldFull, newFull);
+      loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+    }
+    setRenameDialog(null);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    await deleteTag(confirmDelete.name);
+    loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+    setConfirmDelete(null);
   };
 
   const syncDotColor = syncStatus.error
@@ -305,6 +386,7 @@ export function Sidebar() {
           tree={tagTree}
           selectedTags={selectedTags}
           onSelectTag={handleTagClick}
+          onContextMenu={handleTagContextMenu}
         />
       </div>
 
@@ -375,6 +457,69 @@ export function Sidebar() {
           </button>
         </div>
       </div>
+
+      {/* Tag context menu */}
+      {tagContextMenu && (
+        <ContextMenu
+          x={tagContextMenu.x}
+          y={tagContextMenu.y}
+          items={tagContextMenuItems}
+          onClose={() => setTagContextMenu(null)}
+        />
+      )}
+
+      {/* Rename tag dialog */}
+      {renameDialog && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50 animate-fade-in"
+            onClick={() => setRenameDialog(null)}
+          />
+          <div className="relative bg-bear-sidebar border border-bear-border rounded-xl shadow-2xl p-6 w-[360px] animate-scale-in">
+            <h3 className="text-[15px] font-semibold text-bear-text mb-3">
+              Rename Tag
+            </h3>
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+                if (e.key === "Escape") setRenameDialog(null);
+              }}
+              className="w-full bg-bear-bg border border-bear-border rounded-lg px-3 py-2 text-[13px] text-bear-text outline-none focus:border-bear-accent transition-colors"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                onClick={() => setRenameDialog(null)}
+                className="px-3.5 py-1.5 text-[13px] rounded-lg border border-bear-border text-bear-text-secondary hover:bg-bear-hover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRenameSubmit}
+                className="px-3.5 py-1.5 text-[13px] rounded-lg font-medium bg-bear-accent hover:bg-bear-accent-hover text-white transition-colors"
+              >
+                Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete tag dialog */}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Tag?"
+        message={confirmDelete
+          ? `Tag "${confirmDelete.name}" will be removed from ${confirmDelete.noteCount} note${confirmDelete.noteCount === 1 ? "" : "s"}. Notes themselves will not be deleted.`
+          : ""}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

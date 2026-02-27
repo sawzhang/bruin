@@ -74,6 +74,18 @@ export async function getNotesByTag(tag: string): Promise<NoteListItem[]> {
   return invoke("get_notes_by_tag", { tag });
 }
 
+export async function pinTag(name: string, pinned: boolean): Promise<void> {
+  return invoke("pin_tag", { name, pinned });
+}
+
+export async function renameTag(oldName: string, newName: string): Promise<void> {
+  return invoke("rename_tag", { oldName, newName });
+}
+
+export async function deleteTag(name: string): Promise<void> {
+  return invoke("delete_tag", { name });
+}
+
 // Search commands
 export async function searchNotes(
   params: SearchNotesParams,

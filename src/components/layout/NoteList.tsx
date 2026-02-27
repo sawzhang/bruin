@@ -2,13 +2,22 @@ import { useState, useMemo, useCallback, useRef, useEffect, memo } from "react";
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
 import { useNotes } from "../../hooks/useNotes";
+import { useTagStore } from "../../stores/tagStore";
 import type { NoteListItem, NoteState } from "../../types/note";
 import * as tauri from "../../lib/tauri";
+import { ContextMenu, type ContextMenuItem } from "../ui/ContextMenu";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 
 const STATE_DOT_COLORS: Record<NoteState, string> = {
   draft: "bg-gray-400",
   review: "bg-yellow-500",
   published: "bg-green-500",
+};
+
+const STATE_LABELS: Record<NoteState, string> = {
+  draft: "Draft",
+  review: "Review",
+  published: "Published",
 };
 
 const ITEM_HEIGHT = 88; // approximate height of each note item in px
@@ -18,21 +27,20 @@ const OVERSCAN = 5; // extra items to render above/below viewport
 const NoteItem = memo(function NoteItem({
   note,
   isSelected,
-  showTrash,
   onSelect,
-  onRestore,
+  onContextMenu,
 }: {
   note: NoteListItem;
   isSelected: boolean;
-  showTrash: boolean;
-  onSelect: (id: string) => void;
-  onRestore: (id: string) => void;
+  onSelect: (id: string, shiftKey: boolean) => void;
+  onContextMenu: (e: React.MouseEvent, note: NoteListItem) => void;
 }) {
   return (
     <button
-      onClick={() => onSelect(note.id)}
+      onClick={(e) => onSelect(note.id, e.shiftKey)}
+      onContextMenu={(e) => onContextMenu(e, note)}
       className={clsx(
-        "w-full text-left px-3 py-2.5 border-b border-bear-border/50 transition-colors duration-150",
+        "w-full text-left px-3 py-2.5 border-b border-bear-border/50 transition-colors duration-150 group",
         isSelected ? "bg-bear-active" : "hover:bg-bear-hover",
       )}
     >
@@ -55,7 +63,7 @@ const NoteItem = memo(function NoteItem({
           )}
           title={note.state}
         />
-        <span className="text-[14px] font-medium text-bear-text truncate">
+        <span className="text-[14px] font-medium text-bear-text truncate flex-1">
           {note.title || "Untitled"}
         </span>
       </div>
@@ -81,24 +89,84 @@ const NoteItem = memo(function NoteItem({
           </div>
         )}
       </div>
-      {showTrash && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRestore(note.id);
-          }}
-          className="mt-1 text-[11px] text-bear-accent hover:text-bear-accent-hover"
-        >
-          Restore
-        </button>
-      )}
     </button>
   );
 });
 
+// Trash view note item with restore and delete actions
+const TrashNoteItem = memo(function TrashNoteItem({
+  note,
+  isSelected,
+  onSelect,
+  onRestore,
+  onDelete,
+}: {
+  note: NoteListItem;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div
+      className={clsx(
+        "w-full text-left px-3 py-2.5 border-b border-bear-border/50 transition-colors duration-150 group",
+        isSelected ? "bg-bear-active" : "hover:bg-bear-hover",
+      )}
+    >
+      <button
+        onClick={() => onSelect(note.id)}
+        className="w-full text-left"
+      >
+        <div className="flex items-center gap-1.5">
+          <span className="text-[14px] font-medium text-bear-text truncate flex-1 opacity-60">
+            {note.title || "Untitled"}
+          </span>
+        </div>
+        <p className="text-[12px] text-bear-text-secondary mt-0.5 line-clamp-2 leading-relaxed opacity-50">
+          {note.preview || "No content"}
+        </p>
+      </button>
+      <div className="flex items-center gap-2 mt-1.5">
+        <span className="text-[11px] text-bear-text-muted">
+          {formatDistanceToNow(new Date(note.updated_at), { addSuffix: true })}
+        </span>
+        <div className="ml-auto flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={(e) => { e.stopPropagation(); onRestore(note.id); }}
+            className="text-[11px] px-2 py-0.5 rounded border border-bear-border text-bear-text-secondary hover:text-green-400 hover:border-green-500/50 transition-colors"
+            title="Restore note"
+          >
+            Restore
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(note.id); }}
+            className="text-[11px] px-2 py-0.5 rounded border border-bear-border text-bear-text-secondary hover:text-red-400 hover:border-red-500/50 transition-colors"
+            title="Delete permanently"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function NoteList() {
-  const { notes, selectedNoteId, selectNote, showTrash, restoreNote } =
-    useNotes();
+  const {
+    notes, selectedNoteIds, selectNote, selectNoteRange,
+    showTrash, restoreNote, trashNote, deleteNote, pinNote, loadNotes, setNoteState,
+  } = useNotes();
+  const selectedTags = useTagStore((s) => s.selectedTags);
+
+  // Handle click with shift support
+  const handleNoteClick = useCallback((id: string, shiftKey: boolean) => {
+    if (shiftKey) {
+      selectNoteRange(id);
+    } else {
+      selectNote(id);
+    }
+  }, [selectNote, selectNoteRange]);
   const [searchFilter, setSearchFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -106,6 +174,21 @@ export function NoteList() {
   const [semanticResults, setSemanticResults] = useState<
     Array<{ id: string; title: string; preview: string; similarity: number; tags: string[] }>
   >([]);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    note: NoteListItem;
+  } | null>(null);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    title: string;
+    message: string;
+    confirmLabel: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // Debounce search input (150ms)
   const handleSearchChange = useCallback(
@@ -145,6 +228,194 @@ export function NoteList() {
     })();
     return () => { cancelled = true; };
   }, [isSemanticSearch, debouncedFilter]);
+
+  // Context menu handler for normal note list
+  const handleContextMenu = useCallback((e: React.MouseEvent, note: NoteListItem) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, note });
+  }, []);
+
+  // Build context menu items for a note (or multi-selection)
+  const contextMenuItems = useMemo((): ContextMenuItem[] => {
+    if (!contextMenu) return [];
+    const note = contextMenu.note;
+    // If right-clicked note is in multi-selection, operate on all; otherwise just this one
+    const isMulti = selectedNoteIds.length > 1 && selectedNoteIds.includes(note.id);
+    const targetIds = isMulti ? selectedNoteIds : [note.id];
+    const count = targetIds.length;
+
+    if (isMulti) {
+      // Multi-selection context menu
+      return [
+        {
+          label: `Pin ${count} Notes`,
+          icon: "\u{1F4CC}",
+          action: async () => {
+            for (const id of targetIds) await tauri.pinNote(id, true);
+            loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+          },
+        },
+        {
+          label: `Move ${count} Notes to Trash`,
+          icon: "\u{1F5D1}",
+          separator: true,
+          action: async () => {
+            for (const id of targetIds) await tauri.trashNote(id);
+            loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+          },
+          variant: "danger" as const,
+        },
+        ...(selectedTags.length === 1 ? [{
+          label: `Remove Tag #${selectedTags[0]} from ${count} Notes`,
+          icon: "\u{2716}",
+          separator: true,
+          action: async () => {
+            const filterTag = selectedTags[0];
+            for (const id of targetIds) {
+              try {
+                const full = await tauri.getNote(id);
+                const newTags = full.tags.filter((t: string) => t !== filterTag);
+                await tauri.updateNote({ id, tags: newTags });
+              } catch { /* ignore */ }
+            }
+            loadNotes({ tags: [filterTag], trashed: false, sort_by: "updated_at", sort_order: "desc" });
+          },
+        }] : []),
+      ];
+    }
+
+    // Single note context menu
+    const items: ContextMenuItem[] = [
+      {
+        label: note.is_pinned ? "Unpin" : "Pin to Top",
+        icon: note.is_pinned ? "\u25CB" : "\u{1F4CC}",
+        action: () => pinNote(note.id),
+      },
+      {
+        label: "Copy",
+        icon: "\u{1F4CB}",
+        action: async () => {
+          try {
+            const full = await tauri.getNote(note.id);
+            await navigator.clipboard.writeText(full.content);
+          } catch { /* ignore */ }
+        },
+      },
+      {
+        label: "Copy Link",
+        icon: "\u{1F517}",
+        action: () => {
+          navigator.clipboard.writeText(`bruin://note/${note.id}`);
+        },
+      },
+      {
+        label: "Copy Note ID",
+        icon: "\u{2139}",
+        action: () => {
+          navigator.clipboard.writeText(note.id);
+        },
+      },
+      {
+        label: "Export Note...",
+        icon: "\u{21E1}",
+        separator: true,
+        action: async () => {
+          try {
+            const md = await tauri.exportNoteMarkdown(note.id);
+            const blob = new Blob([md], { type: "text/markdown" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${note.title || "untitled"}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+          } catch { /* ignore */ }
+        },
+      },
+      {
+        label: "Move to Trash",
+        icon: "\u{1F5D1}",
+        separator: true,
+        action: () => trashNote(note.id),
+        variant: "danger" as const,
+      },
+    ];
+
+    const nextState = note.state === "draft" ? "review" : note.state === "review" ? "published" : "draft";
+    items.push({
+      label: `Set ${STATE_LABELS[nextState]}`,
+      icon: "\u{25C9}",
+      separator: true,
+      action: () => setNoteState(note.id, nextState),
+    });
+
+    items.push({
+      label: "Duplicate Note",
+      icon: "\u{29C9}",
+      action: async () => {
+        try {
+          const full = await tauri.getNote(note.id);
+          await tauri.createNote({
+            title: `${full.title} (copy)`,
+            content: full.content,
+            tags: full.tags,
+          });
+          loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+        } catch { /* ignore */ }
+      },
+    });
+
+    if (selectedTags.length === 1) {
+      const filterTag = selectedTags[0];
+      if (note.tags.includes(filterTag)) {
+        items.push({
+          label: `Remove Tag #${filterTag}`,
+          icon: "\u{2716}",
+          separator: true,
+          action: async () => {
+            try {
+              const full = await tauri.getNote(note.id);
+              const newTags = full.tags.filter((t: string) => t !== filterTag);
+              await tauri.updateNote({ id: note.id, tags: newTags });
+              loadNotes({ tags: [filterTag], trashed: false, sort_by: "updated_at", sort_order: "desc" });
+            } catch { /* ignore */ }
+          },
+        });
+      }
+    }
+
+    return items;
+  }, [contextMenu, selectedNoteIds, pinNote, trashNote, setNoteState, loadNotes, selectedTags]);
+
+  // Confirm permanent delete for a single note
+  const handleConfirmDelete = useCallback((noteId: string) => {
+    const note = notes.find((n) => n.id === noteId);
+    setConfirmDialog({
+      title: "Delete Permanently?",
+      message: `"${note?.title || "Untitled"}" will be permanently deleted. This action cannot be undone.`,
+      confirmLabel: "Delete",
+      onConfirm: () => {
+        deleteNote(noteId, true);
+        setConfirmDialog(null);
+      },
+    });
+  }, [notes, deleteNote]);
+
+  // Empty trash
+  const handleEmptyTrash = useCallback(() => {
+    setConfirmDialog({
+      title: "Empty Trash?",
+      message: `All ${notes.length} note${notes.length === 1 ? "" : "s"} in trash will be permanently deleted. This cannot be undone.`,
+      confirmLabel: "Empty Trash",
+      onConfirm: async () => {
+        for (const note of notes) {
+          await deleteNote(note.id, true);
+        }
+        setConfirmDialog(null);
+        loadNotes({ trashed: true, sort_by: "updated_at", sort_order: "desc" });
+      },
+    });
+  }, [notes, deleteNote, loadNotes]);
 
   // Memoize filtered + sorted list
   const sorted = useMemo(() => {
@@ -230,6 +501,21 @@ export function NoteList() {
         </div>
       </div>
 
+      {/* Trash header with empty button */}
+      {showTrash && notes.length > 0 && (
+        <div className="px-3 pb-2 flex items-center justify-between">
+          <span className="text-[12px] text-bear-text-muted">
+            {notes.length} note{notes.length === 1 ? "" : "s"} in trash
+          </span>
+          <button
+            onClick={handleEmptyTrash}
+            className="text-[11px] px-2 py-0.5 rounded text-red-400 hover:bg-red-500/10 transition-colors"
+          >
+            Empty Trash
+          </button>
+        </div>
+      )}
+
       {/* Semantic search results */}
       {isSemanticSearch && semanticResults.length > 0 && debouncedFilter.trim() && (
         <div className="flex-1 overflow-y-auto">
@@ -239,7 +525,7 @@ export function NoteList() {
               onClick={() => selectNote(result.id)}
               className={clsx(
                 "w-full text-left px-3 py-2.5 border-b border-bear-border/50 transition-colors duration-150",
-                selectedNoteId === result.id ? "bg-bear-active" : "hover:bg-bear-hover",
+                selectedNoteIds.includes(result.id) ? "bg-bear-active" : "hover:bg-bear-hover",
               )}
             >
               <div className="flex items-center gap-1.5">
@@ -278,11 +564,30 @@ export function NoteList() {
         onScroll={useVirtualization ? handleScroll : undefined}
       >
         {sorted.length === 0 && (
-          <p className="px-3 py-4 text-[12px] text-bear-text-muted text-center">
-            {showTrash ? "Trash is empty" : "No notes"}
-          </p>
+          <div className="px-3 py-8 text-center">
+            <p className="text-[13px] text-bear-text-muted">
+              {showTrash ? "Trash is empty" : "No notes"}
+            </p>
+            {showTrash && (
+              <p className="text-[11px] text-bear-text-muted mt-1">
+                Deleted notes will appear here
+              </p>
+            )}
+          </div>
         )}
-        {useVirtualization ? (
+        {showTrash ? (
+          // Trash view with restore/delete buttons
+          sorted.map((note) => (
+            <TrashNoteItem
+              key={note.id}
+              note={note}
+              isSelected={selectedNoteIds.includes(note.id)}
+              onSelect={selectNote}
+              onRestore={restoreNote}
+              onDelete={handleConfirmDelete}
+            />
+          ))
+        ) : useVirtualization ? (
           <div style={{ height: totalHeight, position: "relative" }}>
             <div
               style={{
@@ -296,10 +601,9 @@ export function NoteList() {
                 <NoteItem
                   key={note.id}
                   note={note}
-                  isSelected={selectedNoteId === note.id}
-                  showTrash={showTrash}
-                  onSelect={selectNote}
-                  onRestore={restoreNote}
+                  isSelected={selectedNoteIds.includes(note.id)}
+                  onSelect={handleNoteClick}
+                  onContextMenu={handleContextMenu}
                 />
               ))}
             </div>
@@ -309,15 +613,35 @@ export function NoteList() {
             <NoteItem
               key={note.id}
               note={note}
-              isSelected={selectedNoteId === note.id}
-              showTrash={showTrash}
-              onSelect={selectNote}
-              onRestore={restoreNote}
+              isSelected={selectedNoteIds.includes(note.id)}
+              onSelect={handleNoteClick}
+              onContextMenu={handleContextMenu}
             />
           ))
         )}
       </div>
       )}
+
+      {/* Context menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenuItems}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+
+      {/* Confirm dialog */}
+      <ConfirmDialog
+        open={!!confirmDialog}
+        title={confirmDialog?.title ?? ""}
+        message={confirmDialog?.message ?? ""}
+        confirmLabel={confirmDialog?.confirmLabel ?? "Confirm"}
+        variant="danger"
+        onConfirm={confirmDialog?.onConfirm ?? (() => {})}
+        onCancel={() => setConfirmDialog(null)}
+      />
     </div>
   );
 }

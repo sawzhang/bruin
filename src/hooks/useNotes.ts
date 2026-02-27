@@ -3,11 +3,14 @@ import { useNoteStore } from "../stores/noteStore";
 export function useNotes() {
   const notes = useNoteStore((s) => s.notes);
   const selectedNoteId = useNoteStore((s) => s.selectedNoteId);
+  const selectedNoteIds = useNoteStore((s) => s.selectedNoteIds);
   const currentNote = useNoteStore((s) => s.currentNote);
   const isLoading = useNoteStore((s) => s.isLoading);
   const showTrash = useNoteStore((s) => s.showTrash);
   const loadNotes = useNoteStore((s) => s.loadNotes);
   const selectNote = useNoteStore((s) => s.selectNote);
+  const selectNoteRange = useNoteStore((s) => s.selectNoteRange);
+  const clearSelection = useNoteStore((s) => s.clearSelection);
   const createNote = useNoteStore((s) => s.createNote);
   const updateNote = useNoteStore((s) => s.updateNote);
   const deleteNote = useNoteStore((s) => s.deleteNote);
@@ -20,11 +23,14 @@ export function useNotes() {
   return {
     notes,
     selectedNoteId,
+    selectedNoteIds,
     currentNote,
     isLoading,
     showTrash,
     loadNotes,
     selectNote,
+    selectNoteRange,
+    clearSelection,
     createNote,
     updateNote,
     deleteNote,

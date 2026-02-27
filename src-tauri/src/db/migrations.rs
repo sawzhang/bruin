@@ -422,6 +422,16 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
         )?;
     }
 
+    // Phase 15: Tag pinning
+    let has_tag_pinned: bool = conn
+        .prepare("SELECT COUNT(*) FROM pragma_table_info('tags') WHERE name='is_pinned'")?
+        .query_row([], |row| row.get::<_, i64>(0))
+        .unwrap_or(0)
+        > 0;
+    if !has_tag_pinned {
+        conn.execute_batch("ALTER TABLE tags ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;")?;
+    }
+
     app_handle.manage(Mutex::new(conn));
 
     Ok(())

@@ -5,9 +5,10 @@ interface TagTreeProps {
   tree: TagTreeNode[];
   selectedTags: string[];
   onSelectTag: (tag: string, shiftKey: boolean) => void;
+  onContextMenu: (e: React.MouseEvent, node: TagTreeNode) => void;
 }
 
-export function TagTree({ tree, selectedTags, onSelectTag }: TagTreeProps) {
+export function TagTree({ tree, selectedTags, onSelectTag, onContextMenu }: TagTreeProps) {
   if (tree.length === 0) {
     return (
       <p className="px-3 py-2 text-[11px] text-bear-text-muted">
@@ -25,6 +26,7 @@ export function TagTree({ tree, selectedTags, onSelectTag }: TagTreeProps) {
           depth={0}
           selectedTags={selectedTags}
           onSelectTag={onSelectTag}
+          onContextMenu={onContextMenu}
         />
       ))}
     </div>

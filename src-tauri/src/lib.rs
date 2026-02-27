@@ -15,7 +15,6 @@ pub fn run() {
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .manage(Mutex::new(SyncState::default()))
         .manage(Mutex::new(WatcherState::new()))
         .setup(|app| {
@@ -82,6 +81,9 @@ pub fn run() {
             commands::webhooks::get_webhook_logs,
             commands::tags::list_tags,
             commands::tags::get_notes_by_tag,
+            commands::tags::pin_tag,
+            commands::tags::rename_tag,
+            commands::tags::delete_tag,
             commands::search::search_notes,
             commands::sync::trigger_sync,
             commands::sync::get_sync_status,

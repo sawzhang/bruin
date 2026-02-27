@@ -13,11 +13,16 @@ import { useToastStore } from "./toastStore";
 interface NoteStoreState {
   notes: NoteListItem[];
   selectedNoteId: string | null;
+  selectedNoteIds: string[];
   currentNote: Note | null;
   isLoading: boolean;
   showTrash: boolean;
   loadNotes: (params?: ListNotesParams) => Promise<void>;
   selectNote: (id: string) => Promise<void>;
+  /** Shift+click: select range from last anchor to id */
+  selectNoteRange: (id: string) => void;
+  /** Clear multi-selection */
+  clearSelection: () => void;
   createNote: () => Promise<void>;
   updateNote: (params: UpdateNoteParams) => Promise<void>;
   deleteNote: (id: string, permanent?: boolean) => Promise<void>;
@@ -31,6 +36,7 @@ interface NoteStoreState {
 export const useNoteStore = create<NoteStoreState>((set, get) => ({
   notes: [],
   selectedNoteId: null,
+  selectedNoteIds: [],
   currentNote: null,
   isLoading: false,
   showTrash: false,
@@ -53,7 +59,7 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
   },
 
   selectNote: async (id: string) => {
-    set({ selectedNoteId: id });
+    set({ selectedNoteId: id, selectedNoteIds: [id] });
     try {
       const note = await tauri.getNote(id);
       set({ currentNote: note });
@@ -63,6 +69,33 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
     }
   },
 
+  selectNoteRange: (id: string) => {
+    const { notes, selectedNoteId, selectedNoteIds } = get();
+    const anchor = selectedNoteId;
+    if (!anchor) {
+      // No anchor — just select this one
+      set({ selectedNoteId: id, selectedNoteIds: [id] });
+      return;
+    }
+    const ids = notes.map((n) => n.id);
+    const anchorIdx = ids.indexOf(anchor);
+    const targetIdx = ids.indexOf(id);
+    if (anchorIdx === -1 || targetIdx === -1) {
+      set({ selectedNoteIds: [id] });
+      return;
+    }
+    const start = Math.min(anchorIdx, targetIdx);
+    const end = Math.max(anchorIdx, targetIdx);
+    const rangeIds = ids.slice(start, end + 1);
+    // Merge with existing selection (union)
+    const merged = Array.from(new Set([...selectedNoteIds, ...rangeIds]));
+    set({ selectedNoteIds: merged });
+  },
+
+  clearSelection: () => {
+    set({ selectedNoteIds: [], selectedNoteId: null, currentNote: null });
+  },
+
   createNote: async () => {
     try {
       const note = await tauri.createNote({
@@ -70,7 +103,7 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
         content: "",
         tags: [],
       });
-      set({ selectedNoteId: note.id, currentNote: note });
+      set({ selectedNoteId: note.id, selectedNoteIds: [note.id], currentNote: note });
       await get().loadNotes();
     } catch (err) {
       useToastStore.getState().addToast({ type: "error", message: `Failed to create note: ${err}` });
@@ -106,10 +139,11 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
   deleteNote: async (id: string, permanent = false) => {
     try {
       await tauri.deleteNote(id, permanent);
-      const { selectedNoteId } = get();
+      const { selectedNoteId, selectedNoteIds } = get();
       if (selectedNoteId === id) {
         set({ selectedNoteId: null, currentNote: null });
       }
+      set({ selectedNoteIds: selectedNoteIds.filter((nid) => nid !== id) });
       await get().loadNotes();
     } catch (err) {
       useToastStore.getState().addToast({ type: "error", message: `Failed to delete note: ${err}` });
@@ -133,10 +167,11 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
   trashNote: async (id: string) => {
     try {
       await tauri.trashNote(id);
-      const { selectedNoteId } = get();
+      const { selectedNoteId, selectedNoteIds } = get();
       if (selectedNoteId === id) {
         set({ selectedNoteId: null, currentNote: null });
       }
+      set({ selectedNoteIds: selectedNoteIds.filter((nid) => nid !== id) });
       await get().loadNotes();
     } catch (err) {
       useToastStore.getState().addToast({ type: "error", message: `Failed to trash note: ${err}` });
@@ -166,6 +201,6 @@ export const useNoteStore = create<NoteStoreState>((set, get) => ({
   },
 
   setShowTrash: (show: boolean) => {
-    set({ showTrash: show, selectedNoteId: null, currentNote: null });
+    set({ showTrash: show, selectedNoteId: null, selectedNoteIds: [], currentNote: null });
   },
 }));

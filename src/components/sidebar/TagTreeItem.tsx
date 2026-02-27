@@ -7,6 +7,7 @@ interface TagTreeItemProps {
   depth: number;
   selectedTags: string[];
   onSelectTag: (tag: string, shiftKey: boolean) => void;
+  onContextMenu: (e: React.MouseEvent, node: TagTreeNode) => void;
 }
 
 export function TagTreeItem({
@@ -14,6 +15,7 @@ export function TagTreeItem({
   depth,
   selectedTags,
   onSelectTag,
+  onContextMenu,
 }: TagTreeItemProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
@@ -23,6 +25,7 @@ export function TagTreeItem({
     <div>
       <button
         onClick={(e) => onSelectTag(node.fullPath, e.shiftKey)}
+        onContextMenu={(e) => onContextMenu(e, node)}
         className={clsx(
           "flex items-center w-full text-left px-2 py-1 text-[13px] rounded transition-colors duration-150",
           isSelected
@@ -43,6 +46,17 @@ export function TagTreeItem({
           </span>
         )}
         {!hasChildren && <span className="mr-1 w-3" />}
+        {node.isPinned && (
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="currentColor"
+            className="text-bear-accent shrink-0 mr-1"
+          >
+            <circle cx="5" cy="5" r="3" />
+          </svg>
+        )}
         <span className="truncate flex-1">{node.name}</span>
         <span className="text-[11px] text-bear-text-muted ml-1">
           {node.noteCount}
@@ -57,6 +71,7 @@ export function TagTreeItem({
               depth={depth + 1}
               selectedTags={selectedTags}
               onSelectTag={onSelectTag}
+              onContextMenu={onContextMenu}
             />
           ))}
         </div>
