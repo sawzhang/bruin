@@ -45,6 +45,7 @@ export interface UpdateNoteParams {
 
 export interface ListNotesParams {
   tag?: string;
+  tags?: string[];
   trashed?: boolean;
   sort_by?: "updated_at" | "created_at" | "title";
   sort_order?: "asc" | "desc";

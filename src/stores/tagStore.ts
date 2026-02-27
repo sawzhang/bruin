@@ -5,10 +5,12 @@ import { useToastStore } from "./toastStore";
 
 interface TagState {
   tags: Tag[];
-  selectedTag: string | null;
+  selectedTags: string[];
   tagTree: TagTreeNode[];
   loadTags: () => Promise<void>;
   selectTag: (tag: string | null) => void;
+  toggleTag: (tag: string) => void;
+  clearTags: () => void;
   buildTagTree: () => void;
 }
 
@@ -43,7 +45,7 @@ function buildTree(tags: Tag[]): TagTreeNode[] {
 
 export const useTagStore = create<TagState>((set, get) => ({
   tags: [],
-  selectedTag: null,
+  selectedTags: [],
   tagTree: [],
 
   loadTags: async () => {
@@ -57,7 +59,20 @@ export const useTagStore = create<TagState>((set, get) => ({
   },
 
   selectTag: (tag: string | null) => {
-    set({ selectedTag: tag });
+    set({ selectedTags: tag ? [tag] : [] });
+  },
+
+  toggleTag: (tag: string) => {
+    const { selectedTags } = get();
+    if (selectedTags.includes(tag)) {
+      set({ selectedTags: selectedTags.filter((t) => t !== tag) });
+    } else {
+      set({ selectedTags: [...selectedTags, tag] });
+    }
+  },
+
+  clearTags: () => {
+    set({ selectedTags: [] });
   },
 
   buildTagTree: () => {

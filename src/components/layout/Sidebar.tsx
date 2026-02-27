@@ -11,7 +11,7 @@ import { importMarkdownFiles, getSyncStatus } from "../../lib/tauri";
 import type { SyncState } from "../../types/sync";
 
 export function Sidebar() {
-  const { tagTree, selectedTag, selectTag } = useTags();
+  const { tagTree, selectedTags, selectTag, toggleTag, clearTags } = useTags();
   const { createNote, showTrash, setShowTrash, loadNotes } = useNotes();
   const toggleThemePicker = useUIStore((s) => s.toggleThemePicker);
   const toggleActivityPanel = useUIStore((s) => s.toggleActivityPanel);
@@ -44,18 +44,13 @@ export function Sidebar() {
   }, []);
 
   const handleAllNotes = () => {
-    selectTag(null);
+    clearTags();
     setShowTrash(false);
   };
 
   const handleTrash = () => {
-    selectTag(null);
+    clearTags();
     setShowTrash(true);
-  };
-
-  const handleSelectTag = (tag: string | null) => {
-    setShowTrash(false);
-    selectTag(tag);
   };
 
   const handleAllNotesClick = () => {
@@ -68,12 +63,28 @@ export function Sidebar() {
     loadNotes({ trashed: true, sort_by: "updated_at", sort_order: "desc" });
   };
 
-  const handleTagClick = (tag: string | null) => {
-    handleSelectTag(tag);
-    if (tag) {
-      loadNotes({ tag, trashed: false, sort_by: "updated_at", sort_order: "desc" });
+  const handleTagClick = (tag: string, shiftKey: boolean) => {
+    setShowTrash(false);
+    if (shiftKey) {
+      // Shift+click: toggle this tag in/out of the selection
+      toggleTag(tag);
+      const newTags = selectedTags.includes(tag)
+        ? selectedTags.filter((t) => t !== tag)
+        : [...selectedTags, tag];
+      if (newTags.length === 0) {
+        loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+      } else {
+        loadNotes({ tags: newTags, trashed: false, sort_by: "updated_at", sort_order: "desc" });
+      }
     } else {
-      loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+      // Normal click: if already the only selected tag, deselect; otherwise select only this one
+      if (selectedTags.length === 1 && selectedTags[0] === tag) {
+        clearTags();
+        loadNotes({ trashed: false, sort_by: "updated_at", sort_order: "desc" });
+      } else {
+        selectTag(tag);
+        loadNotes({ tags: [tag], trashed: false, sort_by: "updated_at", sort_order: "desc" });
+      }
     }
   };
 
@@ -144,7 +155,7 @@ export function Sidebar() {
           onClick={handleAllNotesClick}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
-            !showTrash && !selectedTag
+            !showTrash && selectedTags.length === 0
               ? "bg-bear-active text-bear-text"
               : "text-bear-text-secondary hover:bg-bear-hover hover:text-bear-text",
           )}
@@ -292,7 +303,7 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-2">
         <TagTree
           tree={tagTree}
-          selectedTag={selectedTag}
+          selectedTags={selectedTags}
           onSelectTag={handleTagClick}
         />
       </div>

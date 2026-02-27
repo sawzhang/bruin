@@ -207,6 +207,7 @@ pub struct UpdateNoteParams {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ListNotesParams {
     pub tag: Option<String>,
+    pub tags: Option<Vec<String>>,
     pub sort_by: Option<String>,
     pub sort_order: Option<String>,
     pub limit: Option<i64>,

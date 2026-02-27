@@ -3,11 +3,11 @@ import { TagTreeItem } from "./TagTreeItem";
 
 interface TagTreeProps {
   tree: TagTreeNode[];
-  selectedTag: string | null;
-  onSelectTag: (tag: string | null) => void;
+  selectedTags: string[];
+  onSelectTag: (tag: string, shiftKey: boolean) => void;
 }
 
-export function TagTree({ tree, selectedTag, onSelectTag }: TagTreeProps) {
+export function TagTree({ tree, selectedTags, onSelectTag }: TagTreeProps) {
   if (tree.length === 0) {
     return (
       <p className="px-3 py-2 text-[11px] text-bear-text-muted">
@@ -23,7 +23,7 @@ export function TagTree({ tree, selectedTag, onSelectTag }: TagTreeProps) {
           key={node.fullPath}
           node={node}
           depth={0}
-          selectedTag={selectedTag}
+          selectedTags={selectedTags}
           onSelectTag={onSelectTag}
         />
       ))}

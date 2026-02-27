@@ -385,29 +385,59 @@ pub fn list_notes(
 
     let mut items: Vec<NoteListItem> = Vec::new();
 
-    // Build workspace filter clause
-    let ws_clause = if params.workspace_id.is_some() {
-        "AND n.workspace_id = ?5"
-    } else {
-        "AND (?5 IS NULL OR 1=1)"
-    };
     let ws_param = params.workspace_id.clone();
 
-    if let Some(ref tag) = params.tag {
+    // Resolve tag list: prefer `tags` array, fall back to single `tag`
+    let tag_list: Option<Vec<String>> = if let Some(ref tags) = params.tags {
+        if tags.is_empty() { None } else { Some(tags.clone()) }
+    } else {
+        params.tag.as_ref().map(|t| vec![t.clone()])
+    };
+
+    if let Some(ref tags) = tag_list {
+        let placeholders: Vec<String> = tags.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+        let in_clause = placeholders.join(", ");
+        let tag_count = tags.len();
+        let ws_filter = if params.workspace_id.is_some() {
+            format!("AND n.workspace_id = ?{}", tag_count + 4)
+        } else {
+            String::new()
+        };
         let sql = format!(
             "SELECT n.id, n.title, n.content, n.updated_at, n.is_pinned, n.is_trashed, n.word_count, n.state, n.workspace_id \
              FROM notes n \
              JOIN note_tags nt ON n.id = nt.note_id \
              JOIN tags t ON nt.tag_id = t.id \
-             WHERE t.name = ?1 AND n.is_trashed = ?2 {} \
+             WHERE t.name IN ({}) AND n.is_trashed = ?{} {} \
+             GROUP BY n.id \
+             HAVING COUNT(DISTINCT t.name) = ?{} \
              ORDER BY n.is_pinned DESC, n.updated_at DESC \
-             LIMIT ?3 OFFSET ?4",
-            ws_clause
+             LIMIT ?{} OFFSET ?{}",
+            in_clause,
+            tag_count + 1,
+            ws_filter,
+            tag_count + 2,
+            tag_count + 3,
+            tag_count + 4 + if params.workspace_id.is_some() { 1 } else { 0 },
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
 
+        // Build dynamic params
+        let mut sql_params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        for t in tags {
+            sql_params.push(Box::new(t.clone()));
+        }
+        sql_params.push(Box::new(trashed));
+        sql_params.push(Box::new(tags.len() as i64));
+        sql_params.push(Box::new(limit));
+        if params.workspace_id.is_some() {
+            sql_params.push(Box::new(ws_param.clone()));
+        }
+        sql_params.push(Box::new(offset));
+
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> = sql_params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt
-            .query_map(rusqlite::params![tag, trashed, limit, offset, ws_param], |row| {
+            .query_map(param_refs.as_slice(), |row| {
                 let content: String = row.get(2)?;
                 let preview = if content.len() > 200 {
                     let mut end = 200;

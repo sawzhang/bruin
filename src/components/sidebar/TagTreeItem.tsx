@@ -5,24 +5,24 @@ import type { TagTreeNode } from "../../types/tag";
 interface TagTreeItemProps {
   node: TagTreeNode;
   depth: number;
-  selectedTag: string | null;
-  onSelectTag: (tag: string | null) => void;
+  selectedTags: string[];
+  onSelectTag: (tag: string, shiftKey: boolean) => void;
 }
 
 export function TagTreeItem({
   node,
   depth,
-  selectedTag,
+  selectedTags,
   onSelectTag,
 }: TagTreeItemProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
-  const isSelected = selectedTag === node.fullPath;
+  const isSelected = selectedTags.includes(node.fullPath);
 
   return (
     <div>
       <button
-        onClick={() => onSelectTag(node.fullPath)}
+        onClick={(e) => onSelectTag(node.fullPath, e.shiftKey)}
         className={clsx(
           "flex items-center w-full text-left px-2 py-1 text-[13px] rounded transition-colors duration-150",
           isSelected
@@ -55,7 +55,7 @@ export function TagTreeItem({
               key={child.fullPath}
               node={child}
               depth={depth + 1}
-              selectedTag={selectedTag}
+              selectedTags={selectedTags}
               onSelectTag={onSelectTag}
             />
           ))}
