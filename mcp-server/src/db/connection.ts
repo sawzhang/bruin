@@ -3,13 +3,14 @@ import os from "os";
 import path from "path";
 import fs from "fs";
 
-const DB_DIR = path.join(
+const DB_PATH = process.env.BRUIN_DB_PATH || path.join(
   os.homedir(),
   "Library",
   "Application Support",
-  "com.bruin.app"
+  "com.bruin.notes",
+  "bruin.db"
 );
-const DB_PATH = path.join(DB_DIR, "bruin.db");
+const DB_DIR = path.dirname(DB_PATH);
 
 function ensureDatabase(): Database.Database {
   fs.mkdirSync(DB_DIR, { recursive: true });

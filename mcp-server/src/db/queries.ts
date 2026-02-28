@@ -10,12 +10,14 @@ const TAG_REGEX = /#([a-zA-Z0-9_]+(?:\/[a-zA-Z0-9_]+)*)/g;
 /// Writes a timestamp to a trigger file that the Tauri file watcher monitors.
 function notifyTauri(): void {
   try {
-    const triggerDir = path.join(
-      os.homedir(),
-      "Library",
-      "Application Support",
-      "com.bruin.app"
-    );
+    const triggerDir = process.env.BRUIN_DB_PATH
+      ? path.dirname(process.env.BRUIN_DB_PATH)
+      : path.join(
+          os.homedir(),
+          "Library",
+          "Application Support",
+          "com.bruin.notes"
+        );
     fs.mkdirSync(triggerDir, { recursive: true });
     const triggerFile = path.join(triggerDir, ".bruin-sync-trigger");
     fs.writeFileSync(triggerFile, new Date().toISOString());

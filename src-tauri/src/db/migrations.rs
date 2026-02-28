@@ -5,22 +5,42 @@ use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri::Manager;
 
-fn get_db_path() -> PathBuf {
-    let home = dirs_next().expect("Could not determine home directory");
-    let db_dir = home
-        .join("Library")
-        .join("Application Support")
-        .join("com.bruin.app");
-    fs::create_dir_all(&db_dir).expect("Failed to create database directory");
-    db_dir.join("bruin.db")
-}
-
-fn dirs_next() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
-}
-
 pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = get_db_path();
+    let new_dir = app_handle.path().app_data_dir()?;
+    fs::create_dir_all(&new_dir)?;
+    let db_path = new_dir.join("bruin.db");
+
+    // One-time migration: copy data from old com.bruin.app location
+    if !db_path.exists() {
+        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+            let old_dir = home
+                .join("Library")
+                .join("Application Support")
+                .join("com.bruin.app");
+            let old_db = old_dir.join("bruin.db");
+            if old_db.exists() {
+                log::info!("Migrating database from {:?} to {:?}", old_db, db_path);
+                fs::copy(&old_db, &db_path)?;
+                // Also migrate WAL/SHM files if present
+                let old_wal = old_dir.join("bruin.db-wal");
+                let old_shm = old_dir.join("bruin.db-shm");
+                if old_wal.exists() {
+                    let _ = fs::copy(&old_wal, new_dir.join("bruin.db-wal"));
+                }
+                if old_shm.exists() {
+                    let _ = fs::copy(&old_shm, new_dir.join("bruin.db-shm"));
+                }
+                // Migrate images directory
+                let old_images = old_dir.join("images");
+                let new_images = new_dir.join("images");
+                if old_images.exists() && !new_images.exists() {
+                    log::info!("Migrating images from {:?} to {:?}", old_images, new_images);
+                    copy_dir_all(&old_images, &new_images)?;
+                }
+            }
+        }
+    }
+
     let conn = Connection::open(&db_path)?;
 
     conn.execute_batch("PRAGMA journal_mode=WAL;")?;
@@ -434,5 +454,21 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
 
     app_handle.manage(Mutex::new(conn));
 
+    Ok(())
+}
+
+/// Recursively copy a directory and all its contents.
+fn copy_dir_all(src: &PathBuf, dst: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
     Ok(())
 }

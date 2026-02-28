@@ -92,11 +92,8 @@ pub fn start_watcher(app_handle: &AppHandle) -> Result<WatcherState, Box<dyn std
     icloud_w.watch(&icloud_dir, RecursiveMode::NonRecursive)?;
 
     // --- MCP trigger file watcher ---
-    let home = std::env::var("HOME").unwrap_or_default();
-    let app_support_dir = PathBuf::from(&home)
-        .join("Library")
-        .join("Application Support")
-        .join("com.bruin.app");
+    let app_support_dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
     fs::create_dir_all(&app_support_dir)?;
 
     let tx_trigger = tx;
