@@ -23,6 +23,8 @@ export function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
+          data-testid="toast"
+          data-toast-type={toast.type}
           className={`pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-lg border bg-bear-sidebar shadow-lg text-[13px] animate-slide-in-right min-w-[260px] max-w-[400px] ${TOAST_STYLES[toast.type]}`}
         >
           <span className="text-[14px] shrink-0">{TOAST_ICONS[toast.type]}</span>

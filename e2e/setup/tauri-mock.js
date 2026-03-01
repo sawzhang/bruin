@@ -20,6 +20,8 @@
     tasks: [],
     templates: [],
     agents: [],
+    webhooks: [],
+    workflowTemplates: [],
     syncState: { is_syncing: false, last_sync: null, error: null, files_synced: 0 },
     importFiles: null,
     noteLinks: [],
@@ -485,16 +487,54 @@
       logActivity('note_created', note.id, 'Created from template "' + title + '"');
       return Object.assign({}, note);
     },
-    list_workflow_templates: function () { return []; },
+    list_workflow_templates: function () { return db.workflowTemplates.slice(); },
     get_workflow_template: function () { return null; },
     create_workflow_template: function () { return null; },
     execute_workflow: function () { return null; },
     delete_workflow_template: function () { return null; },
-    list_webhooks: function () { return []; },
-    register_webhook: function () { return { id: 'wh-1' }; },
-    delete_webhook: function () { return null; },
-    update_webhook: function () { return null; },
-    test_webhook: function () { return null; },
+    list_webhooks: function () { return db.webhooks.slice(); },
+    register_webhook: function (args) {
+      var webhook = {
+        id: 'wh-' + Date.now(),
+        url: (args && args.url) || '',
+        event_types: (args && args.eventTypes) || (args && args.event_types) || [],
+        secret: (args && args.secret) || '',
+        is_active: true,
+        created_at: now(),
+        last_triggered_at: null,
+        failure_count: 0,
+      };
+      db.webhooks.unshift(webhook);
+      return Object.assign({}, webhook);
+    },
+    delete_webhook: function (args) {
+      db.webhooks = db.webhooks.filter(function (w) { return w.id !== (args && args.id); });
+      return null;
+    },
+    update_webhook: function (args) {
+      var webhook = db.webhooks.find(function (w) { return w.id === (args && args.id); });
+      if (webhook) {
+        if (args.url != null) webhook.url = args.url;
+        if (args.isActive != null) webhook.is_active = args.isActive;
+        if (args.is_active != null) webhook.is_active = args.is_active;
+        if (args.eventTypes != null) webhook.event_types = args.eventTypes;
+      }
+      return webhook ? Object.assign({}, webhook) : null;
+    },
+    test_webhook: function (args) {
+      return {
+        id: 1,
+        webhook_id: (args && args.id) || '',
+        event_type: 'test',
+        payload: '{}',
+        status_code: 200,
+        response_body: 'OK',
+        attempt: 1,
+        success: true,
+        error_message: null,
+        timestamp: now(),
+      };
+    },
     get_webhook_logs: function () { return []; },
     get_word_count: function (args) {
       var note = db.notes.find(function (n) { return n.id === (args && args.id); });

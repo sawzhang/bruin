@@ -135,6 +135,7 @@ export function SettingsPanel() {
               Integrations
             </h3>
             <button
+              data-testid="btn-manage-webhooks"
               onClick={() => {
                 toggleSettings();
                 useUIStore.getState().toggleWebhookManager();

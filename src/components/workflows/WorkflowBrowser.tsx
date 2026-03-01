@@ -24,6 +24,7 @@ export function WorkflowBrowser() {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={toggleBrowser}>
       <div className="fixed inset-0 bg-black/50" />
       <div
+        data-testid="workflow-browser"
         onClick={(e) => e.stopPropagation()}
         className="relative w-[520px] max-h-[70vh] bg-bear-sidebar border border-bear-border rounded-xl shadow-2xl overflow-hidden"
       >
@@ -40,7 +41,7 @@ export function WorkflowBrowser() {
           )}
 
           {!isLoading && workflows.length === 0 && (
-            <p className="px-6 py-8 text-[12px] text-bear-text-muted text-center">
+            <p data-testid="workflow-empty" className="px-6 py-8 text-[12px] text-bear-text-muted text-center">
               No workflow templates available
             </p>
           )}
@@ -48,6 +49,7 @@ export function WorkflowBrowser() {
           {workflows.map((workflow) => (
             <div
               key={workflow.id}
+              data-testid="workflow-item"
               className="px-6 py-3 border-b border-bear-border/50 hover:bg-bear-hover cursor-pointer"
             >
               <div className="flex items-center gap-2 mb-1">

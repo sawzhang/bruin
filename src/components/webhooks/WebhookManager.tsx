@@ -53,6 +53,7 @@ export function WebhookManager() {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={toggleManager}>
       <div className="fixed inset-0 bg-black/50" />
       <div
+        data-testid="webhook-manager"
         onClick={(e) => e.stopPropagation()}
         className="relative w-[640px] max-h-[80vh] bg-bear-sidebar border border-bear-border rounded-xl shadow-2xl overflow-hidden flex flex-col"
       >
@@ -60,6 +61,7 @@ export function WebhookManager() {
           <h2 className="text-[16px] font-semibold text-bear-text">Webhooks</h2>
           <div className="flex items-center gap-2">
             <button
+              data-testid="webhook-add-toggle-btn"
               onClick={() => { setShowForm(!showForm); setSelectedWebhookId(null); }}
               className="text-[12px] text-bear-accent hover:underline"
             >
@@ -75,12 +77,14 @@ export function WebhookManager() {
           {showForm && (
             <div className="px-6 py-4 border-b border-bear-border flex flex-col gap-2">
               <input
+                data-testid="webhook-url-input"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="Webhook URL (https://...)"
                 className="bg-bear-bg border border-bear-border rounded px-3 py-1.5 text-[13px] text-bear-text outline-none"
               />
               <input
+                data-testid="webhook-secret-input"
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 placeholder="Secret key for HMAC-SHA256 signing"
@@ -93,6 +97,7 @@ export function WebhookManager() {
                 className="bg-bear-bg border border-bear-border rounded px-3 py-1.5 text-[13px] text-bear-text outline-none"
               />
               <button
+                data-testid="webhook-register-btn"
                 onClick={handleAdd}
                 disabled={!url.trim() || !secret.trim()}
                 className="self-end px-3 py-1 text-[12px] bg-bear-accent text-white rounded disabled:opacity-50"
@@ -119,13 +124,13 @@ export function WebhookManager() {
               )}
 
               {!isLoading && webhooks.length === 0 && (
-                <p className="px-6 py-8 text-[12px] text-bear-text-muted text-center">
+                <p data-testid="webhook-empty" className="px-6 py-8 text-[12px] text-bear-text-muted text-center">
                   No webhooks registered
                 </p>
               )}
 
               {webhooks.map((webhook) => (
-                <div key={webhook.id} className="px-6 py-3 border-b border-bear-border/50">
+                <div key={webhook.id} data-testid="webhook-item" className="px-6 py-3 border-b border-bear-border/50">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${webhook.is_active ? "bg-green-500" : "bg-gray-400"}`} />
