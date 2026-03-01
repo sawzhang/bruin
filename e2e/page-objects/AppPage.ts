@@ -180,8 +180,11 @@ declare global {
       workspaces: Array<Record<string, unknown>>;
       settings: Record<string, string>;
       activities: Array<Record<string, unknown>>;
+      tasks: Array<Record<string, unknown>>;
+      templates: Array<Record<string, unknown>>;
       _noteSeq: number;
       _actSeq: number;
+      _taskSeq: number;
     };
     __TAURI_INTERNALS__: {
       invoke: (cmd: string, payload?: unknown) => Promise<unknown>;

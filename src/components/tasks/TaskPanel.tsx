@@ -32,7 +32,7 @@ export function TaskPanel() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-bear-list">
+    <div data-testid="task-panel" className="h-full flex flex-col bg-bear-list">
       <div className="px-3 pt-3 pb-2 border-b border-bear-border">
         <h2 className="text-[13px] font-medium text-bear-text mb-2">Tasks</h2>
 
@@ -41,6 +41,8 @@ export function TaskPanel() {
           {([null, "todo", "in_progress", "done"] as (TaskStatus | null)[]).map((status) => (
             <button
               key={status ?? "all"}
+              data-testid="task-filter-btn"
+              data-filter={status ?? "all"}
               onClick={() => setFilterStatus(status)}
               className={clsx(
                 "px-2 py-0.5 text-[11px] rounded transition-colors",
@@ -61,7 +63,7 @@ export function TaskPanel() {
         )}
 
         {!isLoading && tasks.length === 0 && (
-          <p className="px-3 py-4 text-[12px] text-bear-text-muted text-center">No tasks yet</p>
+          <p data-testid="task-list-empty" className="px-3 py-4 text-[12px] text-bear-text-muted text-center">No tasks yet</p>
         )}
 
         {(["todo", "in_progress", "done"] as TaskStatus[]).map((status) => {
@@ -70,15 +72,16 @@ export function TaskPanel() {
           if (group.length === 0) return null;
 
           return (
-            <div key={status}>
+            <div key={status} data-testid="task-group" data-status={status}>
               <p className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-bear-text-muted font-medium bg-bear-sidebar/50">
                 {STATUS_LABELS[status]} ({group.length})
               </p>
               {group.map((task) => (
-                <div key={task.id} className="px-3 py-2 border-b border-bear-border/50 group">
+                <div key={task.id} data-testid="task-item" data-task-id={task.id} className="px-3 py-2 border-b border-bear-border/50 group">
                   <div className="flex items-start gap-2">
                     {task.status !== "done" && (
                       <button
+                        data-testid="task-complete-btn"
                         onClick={() => completeTask(task.id)}
                         className="mt-0.5 w-3.5 h-3.5 rounded-full border border-bear-border hover:border-green-500 shrink-0 transition-colors"
                         title="Complete"
@@ -109,6 +112,7 @@ export function TaskPanel() {
                       </div>
                     </div>
                     <button
+                      data-testid="task-delete-btn"
                       onClick={() => deleteTask(task.id)}
                       className="opacity-0 group-hover:opacity-100 text-[11px] text-bear-text-muted hover:text-red-400 transition-opacity"
                       title="Delete"

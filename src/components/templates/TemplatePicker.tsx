@@ -37,6 +37,7 @@ export function TemplatePicker() {
       onClick={toggle}
     >
       <div
+        data-testid="template-picker"
         className="bg-bear-bg border border-bear-border rounded-lg shadow-xl w-[440px] max-h-[400px] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
@@ -49,6 +50,8 @@ export function TemplatePicker() {
           {templates.map((t) => (
             <button
               key={t.id}
+              data-testid="template-option"
+              data-template-id={t.id}
               onClick={() => handleSelect(t)}
               className="w-full text-left px-4 py-3 border-b border-bear-border/50 hover:bg-bear-hover transition-colors"
             >
@@ -71,7 +74,7 @@ export function TemplatePicker() {
             </button>
           ))}
           {templates.length === 0 && (
-            <p className="px-4 py-6 text-[12px] text-bear-text-muted text-center">
+            <p data-testid="template-empty" className="px-4 py-6 text-[12px] text-bear-text-muted text-center">
               No templates available
             </p>
           )}

@@ -17,8 +17,11 @@
     workspaces: [],
     settings: {},
     activities: [],
+    tasks: [],
+    templates: [],
     _noteSeq: 1,
     _actSeq: 1,
+    _taskSeq: 1,
   };
 
   function uid() { return 'note-' + (db._noteSeq++); }
@@ -354,12 +357,88 @@
     bind_agent_workspace: function () { return null; },
     unbind_agent_workspace: function () { return null; },
     get_agent_workspaces: function () { return []; },
-    list_tasks: function () { return []; },
-    create_task: function () { return { id: 'task-1' }; },
-    update_task: function () { return null; },
-    complete_task: function () { return null; },
+    list_tasks: function (args) {
+      var status = args && args.status;
+      var tasks = db.tasks.slice();
+      if (status) {
+        tasks = tasks.filter(function (t) { return t.status === status; });
+      }
+      return tasks;
+    },
+
+    create_task: function (args) {
+      var task = {
+        id: 'task-' + (db._taskSeq++),
+        title: (args && args.title) || 'Untitled Task',
+        description: (args && args.description) || null,
+        status: 'todo',
+        priority: (args && args.priority) || 'medium',
+        due_date: (args && args.due_date) || null,
+        assigned_agent_id: null,
+        linked_note_id: (args && args.linked_note_id) || null,
+        workspace_id: (args && args.workspace_id) || null,
+        created_at: now(),
+        updated_at: now(),
+      };
+      db.tasks.push(task);
+      return Object.assign({}, task);
+    },
+
+    update_task: function (args) {
+      var task = db.tasks.find(function (t) { return t.id === (args && args.id); });
+      if (!task) return null;
+      if (args.title != null) task.title = args.title;
+      if (args.status != null) task.status = args.status;
+      if (args.priority != null) task.priority = args.priority;
+      task.updated_at = now();
+      return Object.assign({}, task);
+    },
+
+    complete_task: function (args) {
+      var task = db.tasks.find(function (t) { return t.id === (args && args.id); });
+      if (task) {
+        task.status = 'done';
+        task.updated_at = now();
+      }
+      return task ? Object.assign({}, task) : null;
+    },
+
+    delete_task: function (args) {
+      db.tasks = db.tasks.filter(function (t) { return t.id !== (args && args.id); });
+      return null;
+    },
+
     assign_task: function () { return null; },
-    list_templates: function () { return []; },
+
+    list_templates: function () {
+      return db.templates.slice();
+    },
+
+    create_note_from_template: function (args) {
+      var params = (args && args.params) || {};
+      var template = db.templates.find(function (t) { return t.id === params.template_id; });
+      var title = params.title || (template ? template.name : 'From Template');
+      var content = template ? (template.content || '') : '';
+      var tags = template ? (template.tags || []) : [];
+      var note = {
+        id: uid(),
+        title: title,
+        content: content,
+        state: 'draft',
+        is_pinned: false,
+        deleted: false,
+        word_count: countWords(content),
+        tags: tags,
+        workspace_id: null,
+        created_at: now(),
+        updated_at: now(),
+        version: 1,
+      };
+      db.notes.unshift(note);
+      tags.forEach(syncTag);
+      logActivity('note_created', note.id, 'Created from template "' + title + '"');
+      return Object.assign({}, note);
+    },
     list_workflow_templates: function () { return []; },
     get_workflow_template: function () { return null; },
     create_workflow_template: function () { return null; },
