@@ -59,6 +59,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
 
   return (
     <div
+      data-testid="context-menu"
       ref={menuRef}
       className="fixed z-[150] bg-bear-sidebar border border-bear-border rounded-lg shadow-2xl py-1 min-w-[180px] animate-scale-in origin-top-left"
       style={{ left: x, top: y }}
@@ -69,6 +70,8 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             <div className="mx-2 my-1 border-t border-bear-border" />
           )}
           <button
+            data-testid="context-menu-item"
+            data-label={item.label}
             onClick={() => {
               if (item.disabled) return;
               item.action();

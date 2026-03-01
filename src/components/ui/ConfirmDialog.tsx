@@ -42,7 +42,7 @@ export function ConfirmDialog({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
+    <div data-testid="confirm-dialog" className="fixed inset-0 z-[200] flex items-center justify-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 animate-fade-in"
@@ -58,12 +58,14 @@ export function ConfirmDialog({
         </p>
         <div className="flex justify-end gap-2">
           <button
+            data-testid="cancel-btn"
             onClick={onCancel}
             className="px-3.5 py-1.5 text-[13px] rounded-lg border border-bear-border text-bear-text-secondary hover:bg-bear-hover transition-colors"
           >
             {cancelLabel}
           </button>
           <button
+            data-testid="confirm-btn"
             ref={confirmRef}
             onClick={onConfirm}
             className={`px-3.5 py-1.5 text-[13px] rounded-lg font-medium transition-colors ${

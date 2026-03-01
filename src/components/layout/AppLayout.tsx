@@ -47,9 +47,9 @@ export function AppLayout() {
   }, [loadNotes, loadTags, loadWorkspaces, loadSettings]);
 
   return (
-    <div className={`theme-${theme} h-full flex overflow-hidden bg-bear-bg text-bear-text`}>
+    <div data-testid="app-layout" className={`theme-${theme} h-full flex overflow-hidden bg-bear-bg text-bear-text`}>
       {/* Sidebar */}
-      <div style={{ width: sidebarWidth }} className="shrink-0 h-full">
+      <div data-testid="sidebar-wrapper" style={{ width: sidebarWidth }} className="shrink-0 h-full">
         <ErrorBoundary fallbackMessage="Sidebar error">
           <Sidebar />
         </ErrorBoundary>
@@ -59,13 +59,13 @@ export function AppLayout() {
 
       {isGraphViewOpen ? (
         /* Knowledge Graph View */
-        <div className="flex-1 h-full min-w-0">
+        <div data-testid="graph-view" className="flex-1 h-full min-w-0">
           <KnowledgeGraphView />
         </div>
       ) : (
         <>
           {/* Note List */}
-          <div style={{ width: noteListWidth }} className="shrink-0 h-full">
+          <div data-testid="note-list-wrapper" style={{ width: noteListWidth }} className="shrink-0 h-full">
             <ErrorBoundary fallbackMessage="Note list error">
               <NoteList />
             </ErrorBoundary>
@@ -74,7 +74,7 @@ export function AppLayout() {
           <Resizer onResize={(d) => setNoteListWidth(noteListWidth + d)} />
 
           {/* Editor */}
-          <div className="flex-1 h-full min-w-0">
+          <div data-testid="editor-wrapper" className="flex-1 h-full min-w-0">
             <ErrorBoundary fallbackMessage="Editor error">
               <EditorPanel />
             </ErrorBoundary>
@@ -84,14 +84,14 @@ export function AppLayout() {
 
       {/* Task Panel */}
       {isTaskPanelOpen && (
-        <div className="w-[280px] shrink-0 h-full border-l border-bear-border">
+        <div data-testid="task-panel-wrapper" className="w-[280px] shrink-0 h-full border-l border-bear-border">
           <TaskPanel />
         </div>
       )}
 
       {/* Activity Panel */}
       {isActivityPanelOpen && (
-        <div className="w-[280px] shrink-0 h-full border-l border-bear-border">
+        <div data-testid="activity-panel-wrapper" className="w-[280px] shrink-0 h-full border-l border-bear-border">
           <ActivityPanel />
         </div>
       )}

@@ -24,6 +24,8 @@ export function TagTreeItem({
   return (
     <div>
       <button
+        data-testid="tag-item"
+        data-tag-path={node.fullPath}
         onClick={(e) => onSelectTag(node.fullPath, e.shiftKey)}
         onContextMenu={(e) => onContextMenu(e, node)}
         className={clsx(

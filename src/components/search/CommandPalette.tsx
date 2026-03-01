@@ -138,6 +138,7 @@ export function CommandPalette() {
 
   return (
     <div
+      data-testid="command-palette"
       className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
       onClick={toggleCommandPalette}
     >
@@ -151,6 +152,7 @@ export function CommandPalette() {
       >
         <Command shouldFilter={false}>
           <Command.Input
+            data-testid="command-palette-input"
             value={query}
             onValueChange={setQuery}
             placeholder="Search notes... (type > for commands)"
@@ -171,6 +173,8 @@ export function CommandPalette() {
                 {filteredCommands.map((cmd) => (
                   <Command.Item
                     key={cmd.id}
+                    data-testid="command-item"
+                    data-command-id={cmd.id}
                     onSelect={cmd.action}
                     className={itemClass}
                   >
@@ -188,6 +192,8 @@ export function CommandPalette() {
                   <Command.Item
                     key={note.id}
                     value={note.id}
+                    data-testid="search-result"
+                    data-note-id={note.id}
                     onSelect={() => {
                       selectNote(note.id);
                       toggleCommandPalette();

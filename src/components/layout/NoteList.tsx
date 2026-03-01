@@ -37,6 +37,8 @@ const NoteItem = memo(function NoteItem({
 }) {
   return (
     <button
+      data-testid="note-item"
+      data-note-id={note.id}
       onClick={(e) => onSelect(note.id, e.shiftKey)}
       onContextMenu={(e) => onContextMenu(e, note)}
       className={clsx(
@@ -47,6 +49,7 @@ const NoteItem = memo(function NoteItem({
       <div className="flex items-center gap-1.5">
         {note.is_pinned && (
           <svg
+            data-testid="note-pin-icon"
             width="10"
             height="10"
             viewBox="0 0 10 10"
@@ -109,6 +112,8 @@ const TrashNoteItem = memo(function TrashNoteItem({
 }) {
   return (
     <div
+      data-testid="note-item"
+      data-note-id={note.id}
       className={clsx(
         "w-full text-left px-3 py-2.5 border-b border-bear-border/50 transition-colors duration-150 group",
         isSelected ? "bg-bear-active" : "hover:bg-bear-hover",
@@ -475,11 +480,12 @@ export function NoteList() {
   const useVirtualization = sorted.length > 100;
 
   return (
-    <div className="h-full bg-bear-list flex flex-col">
+    <div data-testid="note-list-panel" className="h-full bg-bear-list flex flex-col">
       {/* Search input */}
       <div className="px-3 pt-3 pb-2">
         <div className="flex gap-1.5">
           <input
+            data-testid="note-search-input"
             type="text"
             value={searchFilter}
             onChange={handleSearchChange}
@@ -559,12 +565,13 @@ export function NoteList() {
       {/* Notes list */}
       {(!isSemanticSearch || !debouncedFilter.trim() || semanticResults.length === 0) && (
       <div
+        data-testid="note-list"
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
         onScroll={useVirtualization ? handleScroll : undefined}
       >
         {sorted.length === 0 && (
-          <div className="px-3 py-8 text-center">
+          <div data-testid="note-list-empty" className="px-3 py-8 text-center">
             <p className="text-[13px] text-bear-text-muted">
               {showTrash ? "Trash is empty" : "No notes"}
             </p>

@@ -11,14 +11,14 @@ interface TagTreeProps {
 export function TagTree({ tree, selectedTags, onSelectTag, onContextMenu }: TagTreeProps) {
   if (tree.length === 0) {
     return (
-      <p className="px-3 py-2 text-[11px] text-bear-text-muted">
+      <p data-testid="tag-tree-empty" className="px-3 py-2 text-[11px] text-bear-text-muted">
         No tags yet
       </p>
     );
   }
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div data-testid="tag-tree" className="flex flex-col gap-0.5">
       {tree.map((node) => (
         <TagTreeItem
           key={node.fullPath}

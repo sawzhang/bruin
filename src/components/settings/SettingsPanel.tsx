@@ -32,6 +32,7 @@ export function SettingsPanel() {
     >
       <div className="fixed inset-0 bg-black/50" />
       <div
+        data-testid="settings-panel"
         onClick={(e) => e.stopPropagation()}
         className="relative w-[480px] max-h-[80vh] bg-bear-sidebar border border-bear-border rounded-xl shadow-2xl overflow-y-auto"
       >

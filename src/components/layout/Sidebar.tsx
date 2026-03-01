@@ -199,13 +199,14 @@ export function Sidebar() {
         : "Not synced";
 
   return (
-    <div className="h-full bg-bear-sidebar flex flex-col select-none">
+    <div data-testid="sidebar" className="h-full bg-bear-sidebar flex flex-col select-none">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-3 pb-2">
         <h1 className="text-[15px] font-semibold text-bear-text tracking-tight">
           Bruin
         </h1>
         <button
+          data-testid="new-note-btn"
           onClick={createNote}
           title="New Note"
           className="w-6 h-6 flex items-center justify-center rounded text-bear-text-secondary hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"
@@ -231,8 +232,9 @@ export function Sidebar() {
       </div>
 
       {/* Nav items */}
-      <div className="px-2 flex flex-col gap-0.5">
+      <div data-testid="sidebar-nav" className="px-2 flex flex-col gap-0.5">
         <button
+          data-testid="nav-all-notes"
           onClick={handleAllNotesClick}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
@@ -257,6 +259,7 @@ export function Sidebar() {
           All Notes
         </button>
         <button
+          data-testid="nav-trash"
           onClick={handleTrashClick}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
@@ -280,6 +283,7 @@ export function Sidebar() {
           Trash
         </button>
         <button
+          data-testid="nav-activity"
           onClick={toggleActivityPanel}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
@@ -301,6 +305,7 @@ export function Sidebar() {
           Activity
         </button>
         <button
+          data-testid="nav-graph"
           onClick={toggleGraphView}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
@@ -326,6 +331,7 @@ export function Sidebar() {
           Knowledge Graph
         </button>
         <button
+          data-testid="nav-tasks"
           onClick={toggleTaskPanel}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
@@ -349,6 +355,7 @@ export function Sidebar() {
           Tasks
         </button>
         <button
+          data-testid="nav-agents"
           onClick={toggleAgentDashboard}
           className={clsx(
             "flex items-center gap-2 w-full text-left px-2 py-1.5 text-[13px] rounded transition-colors duration-150",
@@ -392,12 +399,13 @@ export function Sidebar() {
 
       {/* Footer: sync status + import + settings gear */}
       <div className="px-3 py-2 border-t border-bear-border flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <span className={clsx("w-1.5 h-1.5 rounded-full", syncDotColor)} />
-          <span className="text-[11px] text-bear-text-muted">{syncLabel}</span>
+        <div data-testid="sync-status" className="flex items-center gap-1.5">
+          <span data-testid="sync-dot" className={clsx("w-1.5 h-1.5 rounded-full", syncDotColor)} />
+          <span data-testid="sync-label" className="text-[11px] text-bear-text-muted">{syncLabel}</span>
         </div>
         <div className="flex items-center gap-0.5">
           <button
+            data-testid="btn-import"
             onClick={handleImport}
             title="Import Markdown Files"
             className="w-6 h-6 flex items-center justify-center rounded text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"
@@ -418,6 +426,7 @@ export function Sidebar() {
             </svg>
           </button>
           <button
+            data-testid="btn-themes"
             onClick={toggleThemePicker}
             title="Themes (Cmd+T)"
             className="w-6 h-6 flex items-center justify-center rounded text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"
@@ -437,6 +446,7 @@ export function Sidebar() {
             </svg>
           </button>
           <button
+            data-testid="btn-settings"
             onClick={toggleSettings}
             title="Settings (Cmd+,)"
             className="w-6 h-6 flex items-center justify-center rounded text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors duration-150"

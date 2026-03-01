@@ -174,7 +174,7 @@ export function EditorPanel() {
 
   if (!currentNote) {
     return (
-      <div className="h-full bg-bear-editor">
+      <div data-testid="editor-empty-state" className="h-full bg-bear-editor">
         <EmptyState
           message="Select a note to start editing"
           actionLabel="Create your first note"
@@ -185,7 +185,7 @@ export function EditorPanel() {
   }
 
   return (
-    <div className="h-full bg-bear-editor flex flex-col">
+    <div data-testid="editor-panel" className="h-full bg-bear-editor flex flex-col">
       {/* Top toolbar */}
       <div className="px-8 pt-4 pb-1 flex items-center justify-between">
         <div className="flex-1" />
@@ -195,6 +195,7 @@ export function EditorPanel() {
             // Trash view actions
             <>
               <button
+                data-testid="btn-restore"
                 onClick={handleRestore}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] text-green-400 hover:bg-green-500/10 border border-transparent hover:border-green-500/30 transition-colors"
                 title="Restore this note"
@@ -206,6 +207,7 @@ export function EditorPanel() {
                 Restore
               </button>
               <button
+                data-testid="btn-delete-permanent"
                 onClick={handlePermanentDelete}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 transition-colors"
                 title="Delete permanently"
@@ -224,6 +226,7 @@ export function EditorPanel() {
             // Normal view actions
             <>
               <button
+                data-testid="btn-pin"
                 onClick={handlePin}
                 className={`p-1.5 rounded-md transition-colors ${
                   currentNote.is_pinned
@@ -240,6 +243,7 @@ export function EditorPanel() {
               {/* More actions */}
               <div className="relative">
                 <button
+                  data-testid="btn-more"
                   onClick={() => setMoreOpen(!moreOpen)}
                   className="p-1.5 rounded-md text-bear-text-muted hover:text-bear-text hover:bg-bear-hover transition-colors"
                   title="More actions"
@@ -289,6 +293,7 @@ export function EditorPanel() {
       {/* Title */}
       <div className="px-8 pt-2 pb-1">
         <input
+          data-testid="editor-title"
           type="text"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
@@ -300,11 +305,12 @@ export function EditorPanel() {
 
       {/* State badge + transition buttons */}
       <div className="px-8 pb-2 flex items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full text-white ${STATE_COLORS[currentNote.state]}`}>
+        <span data-testid="note-state-badge" className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-full text-white ${STATE_COLORS[currentNote.state]}`}>
           {STATE_LABELS[currentNote.state]}
         </span>
         {!showTrash && STATE_TRANSITIONS[currentNote.state].map((target: NoteState) => (
           <button
+            data-testid={`btn-state-${target}`}
             key={target}
             onClick={() => setNoteState(currentNote.id, target)}
             className="text-[11px] px-2 py-0.5 rounded border border-bear-border text-bear-text-secondary hover:bg-bear-hover transition-colors"
@@ -346,8 +352,8 @@ export function EditorPanel() {
       </div>
 
       {/* Status bar */}
-      <div className="px-8 py-2 border-t border-bear-border/50 flex items-center justify-between text-[11px] text-bear-text-muted">
-        <span>
+      <div data-testid="editor-statusbar" className="px-8 py-2 border-t border-bear-border/50 flex items-center justify-between text-[11px] text-bear-text-muted">
+        <span data-testid="editor-word-count">
           {wordCount} {wordCount === 1 ? "word" : "words"}
         </span>
         <div className="flex items-center gap-3">

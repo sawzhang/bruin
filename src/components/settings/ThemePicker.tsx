@@ -33,7 +33,7 @@ export function ThemePicker() {
       }}
       style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
     >
-      <div className="bg-bear-sidebar rounded-lg shadow-2xl border border-bear-border w-[480px] max-h-[80vh] overflow-hidden">
+      <div data-testid="theme-picker" className="bg-bear-sidebar rounded-lg shadow-2xl border border-bear-border w-[480px] max-h-[80vh] overflow-hidden">
         {/* Header */}
         <div className="px-5 pt-5 pb-3">
           <h2 className="text-[15px] font-semibold text-bear-text">Themes</h2>
@@ -50,6 +50,7 @@ export function ThemePicker() {
             return (
               <button
                 key={theme.id}
+                data-testid={`theme-option-${theme.id}`}
                 onClick={() => setTheme(theme.id)}
                 className={clsx(
                   "rounded-lg border-2 p-3 text-left transition-all duration-150 cursor-pointer",

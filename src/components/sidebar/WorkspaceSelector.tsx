@@ -34,8 +34,9 @@ export function WorkspaceSelector() {
   };
 
   return (
-    <div className="relative">
+    <div data-testid="workspace-selector" className="relative">
       <button
+        data-testid="workspace-trigger"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1.5 w-full px-2 py-1 text-[11px] text-bear-text-secondary hover:text-bear-text rounded hover:bg-bear-hover transition-colors duration-150"
       >
@@ -67,8 +68,9 @@ export function WorkspaceSelector() {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-bear-bg border border-bear-border rounded shadow-lg py-1 max-h-48 overflow-y-auto">
+        <div data-testid="workspace-dropdown" className="absolute left-0 right-0 top-full mt-1 z-50 bg-bear-bg border border-bear-border rounded shadow-lg py-1 max-h-48 overflow-y-auto">
           <button
+            data-testid="workspace-option-all"
             onClick={() => handleSelect(null)}
             className={clsx(
               "w-full text-left px-3 py-1.5 text-[12px] hover:bg-bear-hover transition-colors",
@@ -80,6 +82,8 @@ export function WorkspaceSelector() {
           {workspaces.map((ws) => (
             <button
               key={ws.id}
+              data-testid="workspace-option"
+              data-workspace-id={ws.id}
               onClick={() => handleSelect(ws.id)}
               className={clsx(
                 "w-full text-left px-3 py-1.5 text-[12px] hover:bg-bear-hover transition-colors truncate",
@@ -94,6 +98,7 @@ export function WorkspaceSelector() {
             {isCreating ? (
               <div className="px-2 flex gap-1">
                 <input
+                  data-testid="workspace-name-input"
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
@@ -106,6 +111,7 @@ export function WorkspaceSelector() {
                   autoFocus
                 />
                 <button
+                  data-testid="workspace-create-btn"
                   onClick={handleCreate}
                   className="text-[11px] text-bear-accent hover:text-bear-accent-hover px-1"
                 >
@@ -114,6 +120,7 @@ export function WorkspaceSelector() {
               </div>
             ) : (
               <button
+                data-testid="workspace-new-btn"
                 onClick={() => setIsCreating(true)}
                 className="w-full text-left px-3 py-1.5 text-[12px] text-bear-text-muted hover:bg-bear-hover transition-colors"
               >
