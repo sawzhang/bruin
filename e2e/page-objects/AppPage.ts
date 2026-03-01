@@ -182,6 +182,7 @@ declare global {
       activities: Array<Record<string, unknown>>;
       tasks: Array<Record<string, unknown>>;
       templates: Array<Record<string, unknown>>;
+      agents: Array<Record<string, unknown>>;
       syncState: { is_syncing: boolean; last_sync: string | null; error: string | null; files_synced: number };
       importFiles: Array<{ path: string; title?: string; content?: string }> | null;
       noteLinks: Array<{ source: string; target: string; link_type: string }>;

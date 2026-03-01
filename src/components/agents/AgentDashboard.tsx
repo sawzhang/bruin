@@ -25,6 +25,7 @@ export function AgentDashboard() {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={toggleDashboard}>
       <div className="fixed inset-0 bg-black/50" />
       <div
+        data-testid="agent-dashboard"
         onClick={(e) => e.stopPropagation()}
         className="relative w-[600px] max-h-[80vh] bg-bear-sidebar border border-bear-border rounded-xl shadow-2xl overflow-y-auto"
       >
@@ -37,7 +38,7 @@ export function AgentDashboard() {
 
         <div className="px-6 py-4 flex flex-col gap-4">
           {activeAgents.length === 0 ? (
-            <p className="text-[13px] text-bear-text-muted text-center py-8">
+            <p data-testid="agent-empty" className="text-[13px] text-bear-text-muted text-center py-8">
               No active agents. Register agents in Settings.
             </p>
           ) : (
@@ -48,7 +49,7 @@ export function AgentDashboard() {
               const doneCount = agentTasks.filter((t) => t.status === "done").length;
 
               return (
-                <div key={agent.id} className="p-3 bg-bear-hover rounded-lg">
+                <div key={agent.id} data-testid="agent-card" className="p-3 bg-bear-hover rounded-lg">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="w-2 h-2 rounded-full bg-green-500" />
                     <span className="text-[14px] font-medium text-bear-text">{agent.name}</span>

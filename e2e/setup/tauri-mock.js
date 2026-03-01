@@ -19,6 +19,7 @@
     activities: [],
     tasks: [],
     templates: [],
+    agents: [],
     syncState: { is_syncing: false, last_sync: null, error: null, files_synced: 0 },
     importFiles: null,
     noteLinks: [],
@@ -374,10 +375,29 @@
       }
       return events.slice(0, limit);
     },
-    list_agents: function () { return []; },
-    register_agent: function () { return { id: 'agent-1', name: 'Test Agent' }; },
+    list_agents: function () { return db.agents.slice(); },
+    register_agent: function (args) {
+      var agent = {
+        id: 'agent-' + Date.now(),
+        name: (args && args.name) || 'Agent',
+        description: (args && args.description) || '',
+        capabilities: (args && args.capabilities) || [],
+        is_active: true,
+        created_at: now(),
+        updated_at: now(),
+      };
+      db.agents.push(agent);
+      return Object.assign({}, agent);
+    },
     update_agent: function () { return null; },
-    deactivate_agent: function () { return null; },
+    deactivate_agent: function (args) {
+      var agent = db.agents.find(function (a) { return a.id === (args && args.id); });
+      if (agent) {
+        agent.is_active = false;
+        agent.updated_at = now();
+      }
+      return agent ? Object.assign({}, agent) : null;
+    },
     set_current_agent: function () { return null; },
     get_agent_audit_log: function () { return []; },
     bind_agent_workspace: function () { return null; },

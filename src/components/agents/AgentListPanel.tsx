@@ -26,6 +26,7 @@ export function AgentListPanel() {
           Agents
         </h3>
         <button
+          data-testid="agent-register-toggle-btn"
           onClick={() => setShowForm(!showForm)}
           className="text-[12px] text-bear-accent hover:underline"
         >
@@ -34,20 +35,23 @@ export function AgentListPanel() {
       </div>
 
       {showForm && (
-        <div className="flex flex-col gap-2 p-3 bg-bear-hover rounded-lg">
+        <div data-testid="agent-register-form" className="flex flex-col gap-2 p-3 bg-bear-hover rounded-lg">
           <input
+            data-testid="agent-name-input"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Agent name (e.g. research-bot)"
             className="bg-bear-bg border border-bear-border rounded px-2 py-1.5 text-[13px] text-bear-text outline-none"
           />
           <input
+            data-testid="agent-description-input"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Description (optional)"
             className="bg-bear-bg border border-bear-border rounded px-2 py-1.5 text-[13px] text-bear-text outline-none"
           />
           <button
+            data-testid="agent-register-btn"
             onClick={handleRegister}
             disabled={!name.trim()}
             className="self-end px-3 py-1 text-[12px] bg-bear-accent text-white rounded hover:opacity-90 disabled:opacity-50"
@@ -69,6 +73,7 @@ export function AgentListPanel() {
         {agents.map((agent) => (
           <div
             key={agent.id}
+            data-testid="agent-item"
             className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-bear-hover"
           >
             <div className="flex items-center gap-2 min-w-0">
@@ -86,6 +91,7 @@ export function AgentListPanel() {
             </div>
             {agent.is_active && (
               <button
+                data-testid="agent-deactivate-btn"
                 onClick={() => deactivateAgent(agent.id)}
                 className="text-[11px] text-bear-text-muted hover:text-red-400 shrink-0"
                 title="Deactivate"
