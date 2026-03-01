@@ -21,6 +21,7 @@
     templates: [],
     agents: [],
     webhooks: [],
+    webhookLogs: [],
     workflowTemplates: [],
     syncState: { is_syncing: false, last_sync: null, error: null, files_synced: 0 },
     importFiles: null,
@@ -535,7 +536,7 @@
         timestamp: now(),
       };
     },
-    get_webhook_logs: function () { return []; },
+    get_webhook_logs: function () { return db.webhookLogs.slice(); },
     get_word_count: function (args) {
       var note = db.notes.find(function (n) { return n.id === (args && args.id); });
       return note ? countWords(note.content) : 0;
