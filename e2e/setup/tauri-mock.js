@@ -19,6 +19,9 @@
     activities: [],
     tasks: [],
     templates: [],
+    syncState: { is_syncing: false, last_sync: null, error: null, files_synced: 0 },
+    importFiles: null,
+    noteLinks: [],
     _noteSeq: 1,
     _actSeq: 1,
     _taskSeq: 1,
@@ -272,7 +275,7 @@
     get_current_workspace: function () { return null; },
 
     get_sync_status: function () {
-      return { is_syncing: false, last_sync: null, error: null, files_synced: 0 };
+      return Object.assign({}, db.syncState);
     },
     trigger_sync: function () { return null; },
     get_sync_logs: function () { return []; },
@@ -327,14 +330,37 @@
         : '';
     },
 
-    import_markdown_files: function () { return null; },
+    import_markdown_files: function (args) {
+      var paths = (args && args.paths) || [];
+      paths.forEach(function (path) {
+        var file = (db.importFiles || []).find(function (f) { return f.path === path; });
+        if (file) {
+          var note = {
+            id: uid(),
+            title: file.title || path.split('/').pop().replace('.md', ''),
+            content: file.content || '',
+            state: 'draft',
+            is_pinned: false,
+            deleted: false,
+            word_count: countWords(file.content),
+            tags: [],
+            workspace_id: null,
+            created_at: now(),
+            updated_at: now(),
+            version: 1,
+          };
+          db.notes.unshift(note);
+        }
+      });
+      return null;
+    },
     get_knowledge_graph: function () {
       var nodes = db.notes
         .filter(function (n) { return !n.deleted; })
         .map(function (n) {
           return { id: n.id, title: n.title || 'Untitled', link_count: 0, tags: n.tags || [] };
         });
-      return { nodes: nodes, edges: [] };
+      return { nodes: nodes, edges: db.noteLinks.slice() };
     },
     get_forward_links: function () { return []; },
     get_backlinks: function () { return []; },
@@ -475,7 +501,10 @@
     'plugin:event|emit': function () { return null; },
 
     // Tauri plugin: dialog
-    'plugin:dialog|open': function () { return null; },
+    'plugin:dialog|open': function () {
+      if (!db.importFiles || db.importFiles.length === 0) return null;
+      return db.importFiles.map(function (f) { return f.path; });
+    },
     'plugin:dialog|save': function () { return null; },
 
     // Tauri plugin: fs

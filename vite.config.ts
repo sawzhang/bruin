@@ -7,7 +7,7 @@ export default defineConfig(async () => ({
   plugins: [react()],
   clearScreen: false,
   test: {
-    exclude: ["mobile/**", "node_modules/**", "mcp-server/**"],
+    exclude: ["mobile/**", "node_modules/**", "mcp-server/**", "e2e/**"],
   },
   server: {
     port: 1420,

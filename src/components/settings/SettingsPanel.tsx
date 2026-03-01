@@ -56,6 +56,7 @@ export function SettingsPanel() {
             <div className="flex flex-col gap-3">
               <SettingRow label="Font Family">
                 <select
+                  data-testid="settings-font-family"
                   value={settings.fontFamily}
                   onChange={(e) => settings.setSetting("fontFamily", e.target.value)}
                   className="bg-bear-hover border border-bear-border rounded px-2 py-1 text-[13px] text-bear-text outline-none"
@@ -93,6 +94,7 @@ export function SettingsPanel() {
             <div className="flex flex-col gap-3">
               <SettingRow label="Auto-save Interval">
                 <select
+                  data-testid="settings-auto-save"
                   value={String(settings.autoSaveInterval)}
                   onChange={(e) => settings.setSetting("autoSaveInterval", e.target.value)}
                   className="bg-bear-hover border border-bear-border rounded px-2 py-1 text-[13px] text-bear-text outline-none"
