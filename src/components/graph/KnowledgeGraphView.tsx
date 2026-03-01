@@ -187,12 +187,13 @@ export function KnowledgeGraphView() {
           </div>
         )}
         {!isLoading && graph && graph.nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-bear-text-muted text-[13px]">
+          <div data-testid="graph-empty" className="absolute inset-0 flex items-center justify-center text-bear-text-muted text-[13px]">
             No connections found. Link notes using [[Note Title]] syntax.
           </div>
         )}
         <svg
           ref={svgRef}
+          data-testid="graph-svg"
           className="w-full h-full"
           style={{ color: "var(--bear-text-secondary, #6b7280)" }}
         />

@@ -21,10 +21,11 @@ export function ActivityPanel() {
   }, [loadEvents, agentFilter]);
 
   return (
-    <div className="h-full flex flex-col bg-bear-list">
+    <div data-testid="activity-panel" className="h-full flex flex-col bg-bear-list">
       <div className="px-3 pt-3 pb-2 border-b border-bear-border">
         <h2 className="text-[13px] font-medium text-bear-text">Activity</h2>
         <input
+          data-testid="activity-filter"
           value={agentFilter}
           onChange={(e) => setAgentFilter(e.target.value)}
           placeholder="Filter by agent..."
@@ -38,13 +39,15 @@ export function ActivityPanel() {
           </p>
         )}
         {!isLoading && events.length === 0 && (
-          <p className="px-3 py-4 text-[12px] text-bear-text-muted text-center">
+          <p data-testid="activity-empty" className="px-3 py-4 text-[12px] text-bear-text-muted text-center">
             No activity yet
           </p>
         )}
         {events.map((event) => (
           <div
             key={event.id}
+            data-testid="activity-item"
+            data-event-type={event.event_type}
             className="px-3 py-2 border-b border-bear-border/50"
           >
             <div className="flex items-center gap-1.5">

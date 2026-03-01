@@ -16,7 +16,9 @@
     tags: [],
     workspaces: [],
     settings: {},
+    activities: [],
     _noteSeq: 1,
+    _actSeq: 1,
   };
 
   function uid() { return 'note-' + (db._noteSeq++); }
@@ -45,6 +47,18 @@
       updated_at: note.updated_at,
       created_at: note.created_at,
     };
+  }
+
+  function logActivity(eventType, noteId, summary) {
+    db.activities.unshift({
+      id: 'act-' + (db._actSeq++),
+      event_type: eventType,
+      note_id: noteId || null,
+      summary: summary || '',
+      actor: 'user',
+      agent_id: null,
+      timestamp: now(),
+    });
   }
 
   function syncTag(name) {
@@ -108,6 +122,7 @@
       };
       db.notes.unshift(note);
       tags.forEach(syncTag);
+      logActivity('note_created', note.id, 'Created "' + note.title + '"');
       return Object.assign({}, note);
     },
 
@@ -133,6 +148,7 @@
       note.updated_at = now();
       note.version = (note.version || 1) + 1;
       note.tags.forEach(syncTag);
+      logActivity('note_updated', note.id, 'Updated "' + note.title + '"');
       return Object.assign({}, note);
     },
 
@@ -149,19 +165,28 @@
 
     trash_note: function (args) {
       var note = db.notes.find(function (n) { return n.id === (args && args.id); });
-      if (note) note.deleted = true;
+      if (note) {
+        note.deleted = true;
+        logActivity('note_trashed', note.id, 'Trashed "' + note.title + '"');
+      }
       return null;
     },
 
     restore_note: function (args) {
       var note = db.notes.find(function (n) { return n.id === (args && args.id); });
-      if (note) note.deleted = false;
+      if (note) {
+        note.deleted = false;
+        logActivity('note_restored', note.id, 'Restored "' + note.title + '"');
+      }
       return null;
     },
 
     pin_note: function (args) {
       var note = db.notes.find(function (n) { return n.id === (args && args.id); });
-      if (note) note.is_pinned = args.pinned != null ? args.pinned : !note.is_pinned;
+      if (note) {
+        note.is_pinned = args.pinned != null ? args.pinned : !note.is_pinned;
+        logActivity('note_pinned', note.id, 'Pinned "' + note.title + '"');
+      }
       return null;
     },
 
@@ -170,6 +195,7 @@
       if (!note) throw new Error('Note not found');
       note.state = args.state;
       note.updated_at = now();
+      logActivity('state_changed', note.id, 'State → ' + args.state);
       return Object.assign({}, note);
     },
 
@@ -197,8 +223,8 @@
     },
 
     rename_tag: function (args) {
-      var oldName = args && args.old_name;
-      var newName = args && args.new_name;
+      var oldName = (args && args.old_name) || (args && args.oldName);
+      var newName = (args && args.new_name) || (args && args.newName);
       var tag = db.tags.find(function (t) { return t.name === oldName; });
       if (tag) {
         tag.name = newName;
@@ -299,11 +325,26 @@
     },
 
     import_markdown_files: function () { return null; },
-    get_knowledge_graph: function () { return { nodes: [], edges: [] }; },
+    get_knowledge_graph: function () {
+      var nodes = db.notes
+        .filter(function (n) { return !n.deleted; })
+        .map(function (n) {
+          return { id: n.id, title: n.title || 'Untitled', link_count: 0, tags: n.tags || [] };
+        });
+      return { nodes: nodes, edges: [] };
+    },
     get_forward_links: function () { return []; },
     get_backlinks: function () { return []; },
     sync_note_links: function () { return null; },
-    get_activity_feed: function () { return []; },
+    get_activity_feed: function (args) {
+      var limit = (args && args.limit) || 50;
+      var agentId = args && args.agentId;
+      var events = db.activities.slice();
+      if (agentId) {
+        events = events.filter(function (e) { return e.agent_id === agentId; });
+      }
+      return events.slice(0, limit);
+    },
     list_agents: function () { return []; },
     register_agent: function () { return { id: 'agent-1', name: 'Test Agent' }; },
     update_agent: function () { return null; },

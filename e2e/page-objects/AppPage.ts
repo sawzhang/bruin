@@ -179,7 +179,9 @@ declare global {
       tags: Array<Record<string, unknown>>;
       workspaces: Array<Record<string, unknown>>;
       settings: Record<string, string>;
+      activities: Array<Record<string, unknown>>;
       _noteSeq: number;
+      _actSeq: number;
     };
     __TAURI_INTERNALS__: {
       invoke: (cmd: string, payload?: unknown) => Promise<unknown>;

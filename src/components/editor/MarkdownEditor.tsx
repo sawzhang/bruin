@@ -212,7 +212,7 @@ export function MarkdownEditor({
   if (!editor) return null;
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div data-testid="editor-body" className="flex-1 overflow-y-auto">
       {editor && (
         <BubbleMenu
           editor={editor}

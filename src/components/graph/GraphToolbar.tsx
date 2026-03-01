@@ -14,10 +14,11 @@ export function GraphToolbar({
   onCenter,
 }: GraphToolbarProps) {
   return (
-    <div className="flex items-center gap-4 px-3 py-2 bg-bear-bg border-b border-bear-border text-[12px]">
+    <div data-testid="graph-toolbar" className="flex items-center gap-4 px-3 py-2 bg-bear-bg border-b border-bear-border text-[12px]">
       <label className="flex items-center gap-1.5 text-bear-text-secondary">
         Depth:
         <select
+          data-testid="graph-depth-select"
           value={depth}
           onChange={(e) => onDepthChange(Number(e.target.value))}
           className="bg-bear-bg border border-bear-border rounded px-1.5 py-0.5 text-bear-text outline-none"
@@ -45,6 +46,7 @@ export function GraphToolbar({
       </label>
 
       <button
+        data-testid="graph-center-btn"
         onClick={onCenter}
         className="px-2 py-0.5 rounded border border-bear-border text-bear-text-secondary hover:bg-bear-hover hover:text-bear-text transition-colors"
       >

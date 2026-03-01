@@ -480,7 +480,7 @@ export function Sidebar() {
 
       {/* Rename tag dialog */}
       {renameDialog && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center">
+        <div data-testid="rename-dialog" className="fixed inset-0 z-[200] flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50 animate-fade-in"
             onClick={() => setRenameDialog(null)}
@@ -490,6 +490,7 @@ export function Sidebar() {
               Rename Tag
             </h3>
             <input
+              data-testid="rename-input"
               ref={renameInputRef}
               type="text"
               value={renameValue}
@@ -508,6 +509,7 @@ export function Sidebar() {
                 Cancel
               </button>
               <button
+                data-testid="rename-confirm-btn"
                 onClick={handleRenameSubmit}
                 className="px-3.5 py-1.5 text-[13px] rounded-lg font-medium bg-bear-accent hover:bg-bear-accent-hover text-white transition-colors"
               >
