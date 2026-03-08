@@ -77,7 +77,7 @@ test.describe('Editor Slash Commands', () => {
   test('selecting "Table" inserts a table', async ({ app }) => {
     const editor = await openNoteEditor(app);
     await app.page.keyboard.type('/');
-    await app.page.getByRole('button', { name: 'Table' }).click();
+    await app.page.getByTestId('slash-cmd-table').click();
 
     await expect(editor.locator('table')).toBeVisible();
   });
@@ -99,10 +99,13 @@ test.describe('Editor Slash Commands', () => {
 
     // Insert a table via slash command
     await app.page.keyboard.type('/');
-    await app.page.getByRole('button', { name: 'Table' }).click();
+    await app.page.getByTestId('slash-cmd-table').click();
 
-    // Click inside the table to position cursor
-    await editor.locator('td').first().click();
+    // Type text and select it to trigger the BubbleMenu
+    const firstCell = editor.locator('td').first();
+    await firstCell.click();
+    await app.page.keyboard.type('x');
+    await app.page.keyboard.press('Shift+Home');
 
     // Table controls appear in the bubble menu
     await expect(app.page.getByRole('button', { name: '+Row', exact: true })).toBeVisible();

@@ -37,7 +37,9 @@ test.describe('Duplicate Note Context Menu', () => {
     await app.openNoteContextMenu('Keep This Note');
     await app.clickContextMenuItem('Duplicate Note');
 
-    await expect(app.noteItem('Keep This Note')).toBeVisible();
+    // Both original and copy should be visible; noteItem uses hasText so both match "Keep This Note"
+    // Use count to verify there are exactly 2 note items containing "Keep This Note"
+    await expect(app.noteItem('Keep This Note')).toHaveCount(2);
     await expect(app.noteItem('Keep This Note (copy)')).toBeVisible();
   });
 

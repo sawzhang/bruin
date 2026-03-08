@@ -33,7 +33,7 @@ const STATE_TRANSITIONS: Record<NoteState, NoteState[]> = {
 export function EditorPanel() {
   const {
     currentNote, updateNote, selectNote, createNote, notes,
-    setNoteState, trashNote, pinNote, showTrash, restoreNote, deleteNote,
+    setNoteState, trashNote, pinNote, showTrash, restoreNote, deleteNote, loadNotes,
   } = useNotes();
   const { selectTag, loadTags } = useTags();
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
@@ -98,7 +98,7 @@ export function EditorPanel() {
 
   const handleTagClick = (tag: string) => {
     selectTag(tag);
-    loadTags();
+    loadNotes({ tags: [tag], trashed: false, sort_by: "updated_at", sort_order: "desc" });
   };
 
   const handleWikiLinkClick = (noteTitle: string) => {
@@ -409,7 +409,7 @@ export function EditorPanel() {
         onConfirm={() => {
           trashNote(currentNote.id);
           setConfirmTrash(false);
-          addToast({ type: "info", message: "Note moved to trash" });
+          addToast({ type: "success", message: "Note moved to trash" });
         }}
         onCancel={() => setConfirmTrash(false)}
       />

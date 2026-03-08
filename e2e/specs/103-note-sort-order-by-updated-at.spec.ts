@@ -121,7 +121,7 @@ test.describe('Note Sort Order by Updated At', () => {
     // ties are stable, but let us click the first note to ensure Second appears after)
     // Instead: click Second Created Note and edit it — it should jump to top
     await app.noteItem('Second Created Note').click();
-    await app.page.getByTestId('note-title-input').fill('Second Created Note Updated');
+    await app.page.getByTestId('editor-title').fill('Second Created Note Updated');
 
     // After saving (auto-save fires on title change), the updated note should be first
     await expect(app.page.getByTestId('note-item').first()).toContainText('Second Created Note Updated');

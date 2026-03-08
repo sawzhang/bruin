@@ -15,10 +15,13 @@ async function insertTable(app: import('../page-objects/AppPage').AppPage) {
   const editor = app.page.locator('.ProseMirror');
   await editor.click();
   await app.page.keyboard.type('/');
-  await app.page.getByRole('button', { name: 'Table' }).click();
+  await app.page.getByTestId('slash-cmd-table').click();
 
-  // Click inside the first cell to position cursor in the table
-  await editor.locator('td').first().click();
+  // Type text in the first cell then select it to trigger the BubbleMenu
+  const firstCell = editor.locator('td').first();
+  await firstCell.click();
+  await app.page.keyboard.type('x');
+  await app.page.keyboard.press('Shift+Home');
   return editor;
 }
 
@@ -47,42 +50,57 @@ test.describe('Table Bubble Menu Row/Col Remove', () => {
     await expect(app.page.getByRole('button', { name: 'Del', exact: true })).toBeVisible();
   });
 
-  test('clicking "+Row" then "-Row" returns the table to its original row count', async ({
+  test('clicking "+Row" adds a row to the table', async ({
     app,
   }) => {
     const editor = await insertTable(app);
 
     const initialRowCount = await editor.locator('tr').count();
 
-    // Add a row
+    // Add a row (BubbleMenu is already showing from insertTable's text selection)
     await app.page.getByRole('button', { name: '+Row', exact: true }).click();
-    await editor.locator('td').first().click();
-    const afterAddCount = await editor.locator('tr').count();
-    expect(afterAddCount).toBe(initialRowCount + 1);
 
-    // Remove that row
-    await app.page.getByRole('button', { name: '-Row', exact: true }).click();
-    await editor.locator('td').first().click();
-    const afterRemoveCount = await editor.locator('tr').count();
-    expect(afterRemoveCount).toBe(initialRowCount);
+    // Wait for the row to be added
+    await expect(editor.locator('tr')).toHaveCount(initialRowCount + 1);
   });
 
-  test('clicking "+Col" then "-Col" returns the table to its original column count', async ({
+  test('clicking "-Row" removes a row from the table', async ({
     app,
   }) => {
     const editor = await insertTable(app);
 
-    const initialColCount = await editor.locator('th, td').first().locator('..').locator('td, th').count();
+    const initialRowCount = await editor.locator('tr').count();
+
+    // Remove a row (BubbleMenu is already showing from insertTable's text selection)
+    await app.page.getByRole('button', { name: '-Row', exact: true }).click();
+
+    // Wait for the row to be removed
+    await expect(editor.locator('tr')).toHaveCount(initialRowCount - 1);
+  });
+
+  test('clicking "+Col" adds a column to the table', async ({
+    app,
+  }) => {
+    const editor = await insertTable(app);
+
+    const initialColCount = await editor.locator('tr').first().locator('td, th').count();
 
     // Add a column
     await app.page.getByRole('button', { name: '+Col', exact: true }).click();
-    await editor.locator('td').first().click();
 
-    // Remove that column
+    await expect(editor.locator('tr').first().locator('td, th')).toHaveCount(initialColCount + 1);
+  });
+
+  test('clicking "-Col" removes a column from the table', async ({
+    app,
+  }) => {
+    const editor = await insertTable(app);
+
+    const initialColCount = await editor.locator('tr').first().locator('td, th').count();
+
+    // Remove a column
     await app.page.getByRole('button', { name: '-Col', exact: true }).click();
-    await editor.locator('td').first().click();
 
-    const finalColCount = await editor.locator('th, td').first().locator('..').locator('td, th').count();
-    expect(finalColCount).toBe(initialColCount);
+    await expect(editor.locator('tr').first().locator('td, th')).toHaveCount(initialColCount - 1);
   });
 });

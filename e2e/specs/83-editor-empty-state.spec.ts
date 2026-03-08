@@ -51,16 +51,16 @@ test.describe('Editor Empty State', () => {
     );
   });
 
-  test('clicking All Notes when a note is open keeps editor-panel visible', async ({ app }) => {
+  test('clicking All Notes when a note is open shows empty state (deselects note)', async ({ app }) => {
     await app.seed([{ title: 'Stay Open Note' }]);
     await app.goto();
     await app.noteItem('Stay Open Note').click();
     await expect(app.page.getByTestId('editor-panel')).toBeVisible();
 
-    // Clicking All Notes does not deselect the current note
+    // Clicking All Notes deselects the current note and shows empty state
     await app.navAllNotes.click();
 
-    await expect(app.page.getByTestId('editor-panel')).toBeVisible();
-    await expect(app.page.getByTestId('editor-empty-state')).not.toBeVisible();
+    await expect(app.page.getByTestId('editor-empty-state')).toBeVisible();
+    await expect(app.page.getByTestId('editor-panel')).not.toBeVisible();
   });
 });

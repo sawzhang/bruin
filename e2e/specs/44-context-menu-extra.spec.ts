@@ -13,7 +13,7 @@ test.describe('Context Menu Extra', () => {
     await app.openNoteContextMenu('Copy Me');
 
     await expect(
-      app.page.getByTestId('context-menu-item').filter({ hasText: 'Copy' })
+      app.page.locator('[data-testid="context-menu-item"][data-label="Copy"]')
     ).toBeVisible();
   });
 

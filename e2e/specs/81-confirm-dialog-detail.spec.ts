@@ -86,10 +86,9 @@ test.describe('ConfirmDialog Detail', () => {
   test('permanent-delete confirm-btn has bg-red-600 class (variant="danger")', async ({ app }) => {
     await app.seed([{ title: 'Danger Variant Note' }]);
     await app.goto();
-    // Move to trash via context menu
+    // Move to trash via context menu (no confirm dialog for context menu trash)
     await app.openNoteContextMenu('Danger Variant Note');
     await app.clickContextMenuItem('Move to Trash');
-    await app.confirmDialog();
     // Now in trash — open the note and click permanent delete
     await app.navTrash.click();
     await app.noteItem('Danger Variant Note').click();

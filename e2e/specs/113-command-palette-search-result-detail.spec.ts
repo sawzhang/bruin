@@ -18,7 +18,7 @@ test.describe('Command Palette Search Result Detail', () => {
     await app.page.getByTestId('command-palette-input').fill('Heading Target');
 
     // The cmdk library renders heading="Notes" inside the group
-    await expect(app.page.getByTestId('command-palette').getByText('Notes')).toBeVisible();
+    await expect(app.page.locator('[cmdk-group-heading]').filter({ hasText: 'Notes' })).toBeVisible();
   });
 
   test('"Commands" group heading is visible when query is empty', async ({ app }) => {

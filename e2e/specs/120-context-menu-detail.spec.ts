@@ -27,7 +27,7 @@ test.describe('Context Menu Detail', () => {
     await app.openNoteContextMenu('Multi Label Note');
 
     await expect(
-      app.page.getByTestId('context-menu-item').filter({ hasText: 'Copy' }),
+      app.page.locator('[data-testid="context-menu-item"][data-label="Copy"]'),
     ).toHaveAttribute('data-label', 'Copy');
 
     await expect(
@@ -77,8 +77,8 @@ test.describe('Context Menu Detail', () => {
     await app.openNoteContextMenu('Outside Click Note');
     await expect(app.page.getByTestId('context-menu')).toBeVisible();
 
-    // Click far from the menu (top-left corner)
-    await app.page.mouse.click(10, 10);
+    // Click outside the menu (on the editor area)
+    await app.page.locator('body').click({ position: { x: 600, y: 400 }, force: true });
 
     await expect(app.page.getByTestId('context-menu')).not.toBeVisible();
   });

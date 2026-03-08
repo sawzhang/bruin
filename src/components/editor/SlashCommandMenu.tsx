@@ -49,10 +49,11 @@ export const SlashCommandMenu = forwardRef(
     if (items.length === 0) return null;
 
     return (
-      <div className="bg-bear-sidebar border border-bear-border rounded-lg shadow-xl overflow-hidden py-1 min-w-[200px]">
+      <div data-testid="slash-command-menu" className="bg-bear-sidebar border border-bear-border rounded-lg shadow-xl overflow-hidden py-1 min-w-[200px]">
         {items.map((item, index) => (
           <button
             key={item.title}
+            data-testid={`slash-cmd-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
             onClick={() => selectItem(index)}
             className={`flex items-center gap-2 w-full text-left px-3 py-1.5 text-[13px] transition-colors duration-100 ${
               index === selectedIndex

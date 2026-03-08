@@ -42,10 +42,10 @@ test.describe('App Layout and Note List Panel', () => {
 
     // Open theme picker and select a different theme
     await app.page.getByTestId('btn-themes').click();
-    await app.page.getByTestId('theme-picker').getByText('Bear').click();
+    await app.page.getByTestId('theme-picker').getByText('Solarized Dark').click();
 
     // app-layout class should now reflect the new theme
-    await expect(app.page.getByTestId('app-layout')).toHaveClass(/theme-bear/);
+    await expect(app.page.getByTestId('app-layout')).toHaveClass(/theme-solarized-dark/);
     await expect(app.page.getByTestId('app-layout')).not.toHaveClass(/theme-dark-graphite/);
   });
 

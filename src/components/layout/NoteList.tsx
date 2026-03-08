@@ -495,6 +495,7 @@ export function NoteList() {
           <button
             onClick={() => setIsSemanticSearch(!isSemanticSearch)}
             title={isSemanticSearch ? "Switch to text search" : "Switch to semantic search"}
+            aria-label={isSemanticSearch ? "Switch to text search" : "Switch to semantic search"}
             className={clsx(
               "px-2 py-1.5 rounded border text-[11px] transition-colors",
               isSemanticSearch

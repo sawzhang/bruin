@@ -88,10 +88,9 @@ test.describe('Confirm Dialog Message Text', () => {
     await app.seed([{ title: 'Perm Delete Message Note' }]);
     await app.goto();
 
-    // Move to trash first
+    // Move to trash first (context menu trash has no confirm dialog)
     await app.openNoteContextMenu('Perm Delete Message Note');
     await app.clickContextMenuItem('Move to Trash');
-    await app.confirmDialog();
 
     // Navigate to trash and open the note
     await app.navTrash.click();
@@ -111,7 +110,6 @@ test.describe('Confirm Dialog Message Text', () => {
 
     await app.openNoteContextMenu('Perm Delete Title Note');
     await app.clickContextMenuItem('Move to Trash');
-    await app.confirmDialog();
 
     await app.navTrash.click();
     await app.page.getByTestId('note-item').filter({ hasText: 'Perm Delete Title Note' }).click();

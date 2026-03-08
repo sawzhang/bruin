@@ -65,8 +65,8 @@ test.describe('Agent Dashboard Cards', () => {
     await app.navAgents.click();
 
     const card = app.page.getByTestId('agent-card').filter({ hasText: 'search-bot' });
-    await expect(card.getByText('search')).toBeVisible();
-    await expect(card.getByText('summarize')).toBeVisible();
+    await expect(card.getByText('search', { exact: true })).toBeVisible();
+    await expect(card.getByText('summarize', { exact: true })).toBeVisible();
   });
 
   test('agent card shows at most 3 capability badges even with 4+ capabilities', async ({ app }) => {

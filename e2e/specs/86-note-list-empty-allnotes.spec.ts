@@ -48,7 +48,6 @@ test.describe('Note List Empty — All Notes', () => {
 
     await app.openNoteContextMenu('Will Be Trashed');
     await app.clickContextMenuItem('Move to Trash');
-    await app.confirmDialog();
 
     await expect(app.page.getByTestId('note-list-empty')).toBeVisible();
     await expect(app.page.getByTestId('note-list-empty')).toContainText('No notes');

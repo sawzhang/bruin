@@ -50,12 +50,12 @@ test.describe('Editor Title Input', () => {
     await expect(app.noteItem('Updated Title')).toBeVisible();
   });
 
-  test('editor-title is empty string for a newly created note', async ({ app }) => {
+  test('editor-title is "Untitled" for a newly created note', async ({ app }) => {
     await app.goto();
     await app.createNote();
 
-    // New note has no title yet
-    await expect(app.page.getByTestId('editor-title')).toHaveValue('');
+    // New note gets "Untitled" as default title
+    await expect(app.page.getByTestId('editor-title')).toHaveValue('Untitled');
   });
 
   test('switching between two notes updates editor-title value', async ({ app }) => {
