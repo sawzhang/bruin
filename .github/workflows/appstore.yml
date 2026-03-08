@@ -1,0 +1,115 @@
+name: App Store Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: "build"
+        type: choice
+        options:
+          - build
+          - validate
+          - submit
+
+jobs:
+  appstore:
+    name: Mac App Store Build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: universal-apple-darwin
+
+      - name: Build MCP server
+        run: cd mcp-server && npm ci && npm run build
+
+      - name: Import signing certificates
+        env:
+          APP_CERTIFICATE_BASE64: ${{ secrets.MAS_APP_CERTIFICATE_BASE64 }}
+          INSTALLER_CERTIFICATE_BASE64: ${{ secrets.MAS_INSTALLER_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MAS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import application certificate
+          echo "$APP_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/app_cert.p12
+          security import $RUNNER_TEMP/app_cert.p12 -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
+          # Import installer certificate
+          echo "$INSTALLER_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/installer_cert.p12
+          security import $RUNNER_TEMP/installer_cert.p12 -P "$CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+      - name: Import provisioning profile
+        env:
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.MAS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > src-tauri/embedded.provisionprofile
+
+      - name: Build for App Store
+        env:
+          SIGNING_IDENTITY: ${{ secrets.MAS_SIGNING_IDENTITY }}
+          INSTALLER_IDENTITY: ${{ secrets.MAS_INSTALLER_IDENTITY }}
+        run: |
+          ./scripts/build-appstore.sh
+
+      - name: Write App Store Connect API key
+        if: inputs.action == 'validate' || inputs.action == 'submit'
+        env:
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+          APP_STORE_API_KEY_BASE64: ${{ secrets.APP_STORE_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.private_keys
+          echo "$APP_STORE_API_KEY_BASE64" | base64 --decode > ~/.private_keys/AuthKey_${APP_STORE_API_KEY}.p8
+
+      - name: Validate with App Store Connect
+        if: inputs.action == 'validate' || inputs.action == 'submit'
+        env:
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+          APP_STORE_API_ISSUER: ${{ secrets.APP_STORE_API_ISSUER }}
+        run: |
+          ./scripts/build-appstore.sh --validate --no-build
+
+      - name: Submit to App Store Connect
+        if: inputs.action == 'submit'
+        env:
+          APP_STORE_API_KEY: ${{ secrets.APP_STORE_API_KEY }}
+          APP_STORE_API_ISSUER: ${{ secrets.APP_STORE_API_ISSUER }}
+        run: |
+          ./scripts/build-appstore.sh --submit --no-build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bruin-appstore-pkg
+          path: src-tauri/target/release/Bruin-*-appstore.pkg
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true

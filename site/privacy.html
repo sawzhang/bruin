@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bruin Notes — Privacy Policy</title>
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --text: #e0e0e0;
+            --muted: #999;
+            --accent: #e74c3c;
+            --card-bg: #242424;
+            --border: #333;
+        }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #fafafa;
+                --text: #1a1a1a;
+                --muted: #666;
+                --card-bg: #fff;
+                --border: #e0e0e0;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            padding: 2rem 1rem;
+        }
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .updated {
+            color: var(--muted);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin-top: 2rem;
+            margin-bottom: 0.75rem;
+            color: var(--accent);
+        }
+        p, li {
+            margin-bottom: 0.75rem;
+        }
+        ul {
+            padding-left: 1.5rem;
+        }
+        .summary {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+        .summary strong {
+            color: var(--accent);
+        }
+        a {
+            color: var(--accent);
+        }
+        footer {
+            margin-top: 3rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Privacy Policy</h1>
+        <p class="updated">Last updated: February 26, 2026</p>
+
+        <div class="summary">
+            <strong>Summary:</strong> Bruin Notes does not collect, store, or transmit any personal data to external servers. All your notes and data stay on your device.
+        </div>
+
+        <h2>Data Storage</h2>
+        <p>All data created in Bruin Notes is stored locally on your device in a SQLite database. This includes:</p>
+        <ul>
+            <li>Notes and their content</li>
+            <li>Tags and organizational metadata</li>
+            <li>Task and workflow data</li>
+            <li>App settings and preferences</li>
+            <li>Search embeddings (computed on-device)</li>
+        </ul>
+
+        <h2>iCloud Sync</h2>
+        <p>If you choose to enable iCloud sync, your notes are synced as Markdown files through Apple's iCloud Drive infrastructure. This sync is:</p>
+        <ul>
+            <li>Optional — you can use Bruin entirely offline</li>
+            <li>Managed by Apple's iCloud service and subject to <a href="https://www.apple.com/legal/privacy/">Apple's Privacy Policy</a></li>
+            <li>End-to-end encrypted by Apple when Advanced Data Protection is enabled</li>
+        </ul>
+        <p>Bruin does not operate any sync servers. The sync happens directly between your devices via iCloud.</p>
+
+        <h2>AI and Embeddings</h2>
+        <p>Bruin's semantic search feature uses a machine learning model (all-MiniLM-L6-v2) that runs entirely on your device. No note content is sent to external AI services for embedding computation.</p>
+        <p>When you connect external AI agents via the MCP (Model Context Protocol), those agents may process your note content according to their own privacy policies. Bruin itself does not send data to any AI service.</p>
+
+        <h2>Webhooks</h2>
+        <p>If you configure webhooks, Bruin will send event notifications to the URLs you specify. This is entirely under your control — no webhook data is sent unless you explicitly configure it.</p>
+
+        <h2>Data Collection</h2>
+        <p>Bruin Notes does <strong>not</strong>:</p>
+        <ul>
+            <li>Collect analytics or usage data</li>
+            <li>Use crash reporting services</li>
+            <li>Include advertising SDKs</li>
+            <li>Track your behavior</li>
+            <li>Share data with third parties</li>
+            <li>Require account creation</li>
+        </ul>
+
+        <h2>Third-Party Services</h2>
+        <p>Bruin Notes contains no third-party SDKs, analytics tools, or advertising frameworks. The only external service interaction is Apple's iCloud, which is optional.</p>
+
+        <h2>Children's Privacy</h2>
+        <p>Bruin Notes does not knowingly collect information from children under 13. The app does not collect information from any user.</p>
+
+        <h2>Changes to This Policy</h2>
+        <p>If we update this privacy policy, we will post the changes on this page and update the "Last updated" date. Since Bruin does not collect any contact information, we cannot notify users directly of changes.</p>
+
+        <h2>Contact</h2>
+        <p>If you have questions about this privacy policy, please open an issue on our <a href="https://github.com/sawzhang/bruin">GitHub repository</a>.</p>
+
+        <footer>
+            <p>&copy; 2026 Bruin Notes. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
