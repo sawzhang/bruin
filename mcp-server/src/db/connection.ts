@@ -90,12 +90,11 @@ function ensureDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_activity_note_id ON activity_events(note_id);
   `);
 
-  // Performance: indices for common query patterns
+  // Performance: indices for common query patterns (state index created after state column below)
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
     CREATE INDEX IF NOT EXISTS idx_notes_trashed ON notes(is_trashed);
     CREATE INDEX IF NOT EXISTS idx_notes_pinned_updated ON notes(is_pinned DESC, updated_at DESC);
-    CREATE INDEX IF NOT EXISTS idx_notes_state ON notes(state);
   `);
 
   // Phase 5: Webhooks
@@ -209,6 +208,7 @@ function ensureDatabase(): Database.Database {
   if (hasStateCol.cnt === 0) {
     db.exec("ALTER TABLE notes ADD COLUMN state TEXT NOT NULL DEFAULT 'draft';");
   }
+  db.exec("CREATE INDEX IF NOT EXISTS idx_notes_state ON notes(state);");
 
   // Phase 10: Agents + Agent audit tracking
   db.exec(`
@@ -296,6 +296,14 @@ function ensureDatabase(): Database.Database {
       role TEXT NOT NULL DEFAULT 'member',
       created_at TEXT NOT NULL,
       PRIMARY KEY (agent_id, workspace_id)
+    );
+  `);
+
+  // Settings KV store
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
     );
   `);
 

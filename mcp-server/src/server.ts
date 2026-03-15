@@ -115,11 +115,11 @@ export function createServer(): McpServer {
     "read_note",
     "Read a note by ID",
     {
-      id: z.string().describe("The UUID of the note"),
+      note_id: z.string().describe("The UUID of the note"),
     },
     async (args) => {
-      const note = getNote(args.id);
-      if (!note) return error(`Note '${args.id}' not found`);
+      const note = getNote(args.note_id);
+      if (!note) return error(`Note '${args.note_id}' not found`);
       return text(note);
     }
   );
@@ -128,15 +128,15 @@ export function createServer(): McpServer {
     "update_note",
     "Update an existing note",
     {
-      id: z.string().describe("The UUID of the note to update"),
+      note_id: z.string().describe("The UUID of the note to update"),
       title: z.string().optional().describe("New title"),
       content: z.string().optional().describe("New markdown content"),
       tags: z.array(z.string()).optional().describe("New tags. If omitted and content is updated, tags are re-extracted from content."),
     },
     async (args) => {
-      const note = updateNote(args.id, args.title, args.content, args.tags);
-      if (!note) return error(`Note '${args.id}' not found`);
-      notifyNoteChanged(args.id);
+      const note = updateNote(args.note_id, args.title, args.content, args.tags);
+      if (!note) return error(`Note '${args.note_id}' not found`);
+      notifyNoteChanged(args.note_id);
       return text(note);
     }
   );
@@ -145,11 +145,11 @@ export function createServer(): McpServer {
     "delete_note",
     "Delete a note (soft delete to trash, or permanent)",
     {
-      id: z.string().describe("The UUID of the note to delete"),
+      note_id: z.string().describe("The UUID of the note to delete"),
       permanent: z.boolean().optional().describe("If true, permanently delete. Default is soft delete to trash."),
     },
     async (args) => {
-      const result = deleteNote(args.id, args.permanent ?? false);
+      const result = deleteNote(args.note_id, args.permanent ?? false);
       if (!result.success) return error(result.message);
       notifyNotesListChanged();
       return text(result);
@@ -173,14 +173,14 @@ export function createServer(): McpServer {
     "set_note_state",
     "Transition a note's workflow state. Valid transitions: draft→review, review→published, review→draft, published→review.",
     {
-      id: z.string().describe("The UUID of the note"),
+      note_id: z.string().describe("The UUID of the note"),
       state: z.enum(["draft", "review", "published"]).describe("Target state"),
     },
     async (args) => {
       try {
-        const note = setNoteState(args.id, args.state);
-        if (!note) return error(`Note '${args.id}' not found`);
-        notifyNoteChanged(args.id);
+        const note = setNoteState(args.note_id, args.state);
+        if (!note) return error(`Note '${args.note_id}' not found`);
+        notifyNoteChanged(args.note_id);
         return text(note);
       } catch (e: unknown) {
         return error((e as Error).message);
@@ -362,10 +362,10 @@ export function createServer(): McpServer {
     "delete_webhook",
     "Delete a webhook by ID",
     {
-      id: z.string().describe("The UUID of the webhook to delete"),
+      webhook_id: z.string().describe("The UUID of the webhook to delete"),
     },
     async (args) => {
-      const result = deleteWebhook(args.id);
+      const result = deleteWebhook(args.webhook_id);
       if (!result.success) return error(result.message);
       return text(result);
     }
@@ -608,7 +608,7 @@ export function createServer(): McpServer {
     "update_task",
     "Update a task's properties (title, description, status, priority, due date, assignment, linked note)",
     {
-      id: z.string().describe("Task ID to update"),
+      task_id: z.string().describe("Task ID to update"),
       title: z.string().optional().describe("New title"),
       description: z.string().optional().describe("New description"),
       status: z.enum(["todo", "in_progress", "done"]).optional().describe("New status"),
@@ -618,9 +618,9 @@ export function createServer(): McpServer {
       linked_note_id: z.string().optional().describe("New linked note"),
     },
     async (args) => {
-      const { id, ...updates } = args;
-      const task = updateTask(id, updates);
-      if (!task) return error(`Task '${id}' not found`);
+      const { task_id, ...updates } = args;
+      const task = updateTask(task_id, updates);
+      if (!task) return error(`Task '${task_id}' not found`);
       return text(task);
     }
   );
@@ -629,11 +629,11 @@ export function createServer(): McpServer {
     "complete_task",
     "Mark a task as done",
     {
-      id: z.string().describe("Task ID to complete"),
+      task_id: z.string().describe("Task ID to complete"),
     },
     async (args) => {
-      const task = completeTask(args.id);
-      if (!task) return error(`Task '${args.id}' not found`);
+      const task = completeTask(args.task_id);
+      if (!task) return error(`Task '${args.task_id}' not found`);
       return text(task);
     }
   );
@@ -642,12 +642,12 @@ export function createServer(): McpServer {
     "assign_task",
     "Assign a task to a specific agent",
     {
-      id: z.string().describe("Task ID"),
+      task_id: z.string().describe("Task ID"),
       agent_id: z.string().describe("Agent ID to assign the task to"),
     },
     async (args) => {
-      const task = assignTask(args.id, args.agent_id);
-      if (!task) return error(`Task '${args.id}' not found`);
+      const task = assignTask(args.task_id, args.agent_id);
+      if (!task) return error(`Task '${args.task_id}' not found`);
       return text(task);
     }
   );
@@ -668,11 +668,11 @@ export function createServer(): McpServer {
     "get_workflow_template",
     "Get a specific workflow template with its steps",
     {
-      id: z.string().describe("Workflow template ID"),
+      workflow_id: z.string().describe("Workflow template ID"),
     },
     async (args) => {
-      const workflow = getWorkflowTemplate(args.id);
-      if (!workflow) return error(`Workflow template '${args.id}' not found`);
+      const workflow = getWorkflowTemplate(args.workflow_id);
+      if (!workflow) return error(`Workflow template '${args.workflow_id}' not found`);
       return text(workflow);
     }
   );
@@ -681,11 +681,11 @@ export function createServer(): McpServer {
     "execute_workflow",
     "Execute a workflow template server-side. Each step is run automatically with result chaining between steps.",
     {
-      id: z.string().describe("Workflow template ID to execute"),
+      workflow_id: z.string().describe("Workflow template ID to execute"),
     },
     async (args) => {
       try {
-        const results = executeWorkflow(args.id);
+        const results = executeWorkflow(args.workflow_id);
         return text({ steps: results });
       } catch (e: unknown) {
         return error((e as Error).message);
@@ -724,15 +724,15 @@ export function createServer(): McpServer {
     "update_webhook",
     "Update a webhook's URL, event types, or active status",
     {
-      id: z.string().describe("Webhook ID to update"),
+      webhook_id: z.string().describe("Webhook ID to update"),
       url: z.string().optional().describe("New URL"),
       event_types: z.array(z.string()).optional().describe("New event types"),
       is_active: z.boolean().optional().describe("Enable/disable the webhook"),
     },
     async (args) => {
-      const { id, ...updates } = args;
-      const webhook = updateWebhook(id, updates);
-      if (!webhook) return error(`Webhook '${id}' not found`);
+      const { webhook_id, ...updates } = args;
+      const webhook = updateWebhook(webhook_id, updates);
+      if (!webhook) return error(`Webhook '${webhook_id}' not found`);
       return text(webhook);
     }
   );
@@ -741,11 +741,11 @@ export function createServer(): McpServer {
     "test_webhook",
     "Send a test delivery to a webhook and return the result",
     {
-      id: z.string().describe("Webhook ID to test"),
+      webhook_id: z.string().describe("Webhook ID to test"),
     },
     async (args) => {
       try {
-        const log = await testWebhook(args.id);
+        const log = await testWebhook(args.webhook_id);
         return text(log);
       } catch (e: unknown) {
         return error((e as Error).message);
@@ -804,11 +804,11 @@ export function createServer(): McpServer {
     "get_agent",
     "Get a single agent by ID with capabilities and status",
     {
-      id: z.string().describe("Agent ID"),
+      agent_id: z.string().describe("Agent ID"),
     },
     async (args) => {
-      const agent = getAgent(args.id);
-      if (!agent) return error(`Agent '${args.id}' not found`);
+      const agent = getAgent(args.agent_id);
+      if (!agent) return error(`Agent '${args.agent_id}' not found`);
       return text(agent);
     }
   );
@@ -817,15 +817,15 @@ export function createServer(): McpServer {
     "update_agent",
     "Update an agent's name, description, or capabilities",
     {
-      id: z.string().describe("Agent ID to update"),
+      agent_id: z.string().describe("Agent ID to update"),
       name: z.string().optional().describe("New name"),
       description: z.string().optional().describe("New description"),
       capabilities: z.array(z.string()).optional().describe("New capabilities list"),
     },
     async (args) => {
-      const { id, ...updates } = args;
-      const agent = updateAgent(id, updates);
-      if (!agent) return error(`Agent '${id}' not found`);
+      const { agent_id, ...updates } = args;
+      const agent = updateAgent(agent_id, updates);
+      if (!agent) return error(`Agent '${agent_id}' not found`);
       return text(agent);
     }
   );
@@ -834,11 +834,11 @@ export function createServer(): McpServer {
     "deactivate_agent",
     "Deactivate an agent, preventing it from performing further actions",
     {
-      id: z.string().describe("Agent ID to deactivate"),
+      agent_id: z.string().describe("Agent ID to deactivate"),
     },
     async (args) => {
-      const agent = deactivateAgent(args.id);
-      if (!agent) return error(`Agent '${args.id}' not found`);
+      const agent = deactivateAgent(args.agent_id);
+      if (!agent) return error(`Agent '${args.agent_id}' not found`);
       return text(agent);
     }
   );
@@ -847,10 +847,10 @@ export function createServer(): McpServer {
     "delete_workspace",
     "Delete a workspace by ID",
     {
-      id: z.string().describe("Workspace ID to delete"),
+      workspace_id: z.string().describe("Workspace ID to delete"),
     },
     async (args) => {
-      const result = deleteWorkspace(args.id);
+      const result = deleteWorkspace(args.workspace_id);
       if (!result.success) return error(result.message);
       return text(result);
     }
@@ -874,10 +874,10 @@ export function createServer(): McpServer {
     "delete_workflow_template",
     "Delete a workflow template by ID",
     {
-      id: z.string().describe("Workflow template ID to delete"),
+      workflow_id: z.string().describe("Workflow template ID to delete"),
     },
     async (args) => {
-      const result = deleteWorkflowTemplate(args.id);
+      const result = deleteWorkflowTemplate(args.workflow_id);
       if (!result.success) return error(result.message);
       return text(result);
     }
@@ -887,13 +887,13 @@ export function createServer(): McpServer {
     "pin_note",
     "Pin or unpin a note. Pinned notes appear at the top of lists.",
     {
-      id: z.string().describe("Note ID"),
+      note_id: z.string().describe("Note ID"),
       pinned: z.boolean().describe("True to pin, false to unpin"),
     },
     async (args) => {
-      const note = pinNote(args.id, args.pinned);
-      if (!note) return error(`Note '${args.id}' not found`);
-      notifyNoteChanged(args.id);
+      const note = pinNote(args.note_id, args.pinned);
+      if (!note) return error(`Note '${args.note_id}' not found`);
+      notifyNoteChanged(args.note_id);
       return text(note);
     }
   );
@@ -902,11 +902,11 @@ export function createServer(): McpServer {
     "restore_note",
     "Restore a note from trash",
     {
-      id: z.string().describe("Note ID to restore"),
+      note_id: z.string().describe("Note ID to restore"),
     },
     async (args) => {
-      const note = restoreNote(args.id);
-      if (!note) return error(`Trashed note '${args.id}' not found`);
+      const note = restoreNote(args.note_id);
+      if (!note) return error(`Trashed note '${args.note_id}' not found`);
       notifyNotesListChanged();
       return text(note);
     }
@@ -951,11 +951,11 @@ export function createServer(): McpServer {
     "export_note_markdown",
     "Export a note as markdown with YAML frontmatter (title, dates, state, tags)",
     {
-      id: z.string().describe("Note ID to export"),
+      note_id: z.string().describe("Note ID to export"),
     },
     async (args) => {
-      const md = exportNoteMarkdown(args.id);
-      if (!md) return error(`Note '${args.id}' not found`);
+      const md = exportNoteMarkdown(args.note_id);
+      if (!md) return error(`Note '${args.note_id}' not found`);
       return { content: [{ type: "text" as const, text: md }] };
     }
   );
@@ -964,11 +964,11 @@ export function createServer(): McpServer {
     "export_note_html",
     "Export a note as a standalone HTML document",
     {
-      id: z.string().describe("Note ID to export"),
+      note_id: z.string().describe("Note ID to export"),
     },
     async (args) => {
-      const html = exportNoteHtml(args.id);
-      if (!html) return error(`Note '${args.id}' not found`);
+      const html = exportNoteHtml(args.note_id);
+      if (!html) return error(`Note '${args.note_id}' not found`);
       return { content: [{ type: "text" as const, text: html }] };
     }
   );
