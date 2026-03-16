@@ -76,22 +76,33 @@ echo "    Version:      $VERSION"
 echo ""
 
 # --- Step 1: Build the app ---
-APP_BUNDLE="$TARGET_DIR/bundle/macos/Bruin.app"
+UNIVERSAL_APP="$TAURI_DIR/target/universal-apple-darwin/release/bundle/macos/Bruin.app"
+FALLBACK_APP="$TARGET_DIR/bundle/macos/Bruin.app"
+APP_BUNDLE="$UNIVERSAL_APP"
 
-if [ "$NO_BUILD" = "--no-build" ] && [ -d "$APP_BUNDLE" ]; then
+if [ "$NO_BUILD" = "--no-build" ]; then
+    # Find existing app (prefer universal)
+    if [ -d "$UNIVERSAL_APP" ]; then
+        APP_BUNDLE="$UNIVERSAL_APP"
+    elif [ -d "$FALLBACK_APP" ]; then
+        APP_BUNDLE="$FALLBACK_APP"
+    else
+        echo "ERROR: No existing Bruin.app found. Remove --no-build to build first."
+        exit 1
+    fi
     echo "==> Step 1/5: Skipping build (--no-build, using existing app)"
 else
     echo "==> Step 1/5: Building Bruin (release)..."
     cd "$PROJECT_ROOT"
     npm run tauri build -- --target universal-apple-darwin 2>&1 | tail -5
 
-    if [ ! -d "$APP_BUNDLE" ]; then
-        # Fallback: try architecture-specific path
-        APP_BUNDLE=$(find "$TARGET_DIR" -name "Bruin.app" -type d | head -1)
-        if [ -z "$APP_BUNDLE" ]; then
-            echo "ERROR: Bruin.app not found after build."
-            exit 1
-        fi
+    if [ -d "$UNIVERSAL_APP" ]; then
+        APP_BUNDLE="$UNIVERSAL_APP"
+    elif [ -d "$FALLBACK_APP" ]; then
+        APP_BUNDLE="$FALLBACK_APP"
+    else
+        echo "ERROR: Bruin.app not found after build."
+        exit 1
     fi
 fi
 echo "    App: $APP_BUNDLE"
@@ -110,6 +121,11 @@ if [ -f "$OVERRIDE_PLIST" ]; then
     echo "    Merged Info.plist overrides"
 fi
 
+# Set build number (auto-increment or from BUILD_NUMBER env)
+BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP_PLIST"
+echo "    Build number: $BUILD_NUMBER"
+
 # --- Step 4: Code sign with entitlements ---
 echo "==> Step 4/5: Code signing for App Store..."
 
@@ -120,13 +136,13 @@ CHILD_ENTITLEMENTS="$TAURI_DIR/Entitlements.child.plist"
 find "$APP_BUNDLE/Contents/Frameworks" -name "*.dylib" -o -name "*.framework" 2>/dev/null | while read -r framework; do
     codesign --force --options runtime --sign "$SIGNING_IDENTITY" \
         --entitlements "$CHILD_ENTITLEMENTS" "$framework"
-done
+done || true
 
 # Sign helper apps
 find "$APP_BUNDLE" -name "*.app" -path "*/Helpers/*" 2>/dev/null | while read -r helper; do
     codesign --force --options runtime --sign "$SIGNING_IDENTITY" \
         --entitlements "$CHILD_ENTITLEMENTS" "$helper"
-done
+done || true
 
 # Sign the main app bundle
 codesign --force --options runtime --sign "$SIGNING_IDENTITY" \

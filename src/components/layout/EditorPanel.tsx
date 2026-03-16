@@ -35,7 +35,7 @@ export function EditorPanel() {
     currentNote, updateNote, selectNote, createNote, notes,
     setNoteState, trashNote, pinNote, showTrash, restoreNote, deleteNote, loadNotes,
   } = useNotes();
-  const { selectTag, loadTags } = useTags();
+  const { selectTag } = useTags();
   const autoSaveInterval = useSettingsStore((s) => s.autoSaveInterval);
   const addToast = useToastStore((s) => s.addToast);
 

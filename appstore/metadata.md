@@ -22,7 +22,7 @@ Knowledge Graph
 Visualize how your notes connect. An interactive D3-powered force graph reveals relationships through wiki-links and backlinks. Zoom, pan, filter by depth, and color-code by tag.
 
 AI Agent Integration (MCP)
-60 tools available via the Model Context Protocol. Any AI model — Claude, GPT, or your custom agents — can create notes, search your knowledge base, manage tasks, and run workflows. No vendor lock-in.
+60 tools available via the Model Context Protocol. Any AI model — Claude, Gemini, or your custom agents — can create notes, search your knowledge base, manage tasks, and run workflows. No vendor lock-in.
 
 Human-in-the-Loop Review
 Agents write drafts. You review and publish. The three-state lifecycle (Draft, Review, Published) ensures you always have the final say on what enters your knowledge base.
@@ -164,4 +164,4 @@ Caption: "Seamless iCloud sync across all your Macs"
 Show the agent registry or webhook interface:
 - Registered agents listed
 - Tool count visible
-Caption: "60 MCP tools for any AI model — Claude, GPT, and more"
+Caption: "60 MCP tools for any AI model — Claude, Gemini, and more"
