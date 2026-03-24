@@ -7,7 +7,7 @@
 [![CI](https://github.com/sawzhang/bruin/actions/workflows/ci.yml/badge.svg)](https://github.com/sawzhang/bruin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[Website](https://sawzhang.github.io/bruin/)**
+**[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[Website](https://bruin.me)**
 
 > If macOS shows "app is damaged", run: `xattr -cr /Applications/Bruin.app`
 
