@@ -36,6 +36,37 @@ Every note app is adding "AI features" — a chatbot here, a summarizer there. B
 | **iCloud Sync** | Bidirectional sync with SHA-256 conflict resolution |
 | **6 Themes** | Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more |
 
+## Claude Code Integration
+
+**One command to make Claude natively understand Bruin:**
+
+```bash
+npx bruin-mcp-server --install-skill
+```
+
+Installs `.claude/skills/bruin.md` to `~/.claude/skills/`. Claude now knows your entire knowledge base — 60 tools, MCP prompts, tag conventions, and common workflows — across every session.
+
+Then add the MCP server to Claude Code settings:
+
+```json
+{
+  "mcpServers": {
+    "bruin": { "command": "npx", "args": ["bruin-mcp-server"] }
+  }
+}
+```
+
+Use MCP Prompts directly in Claude Code:
+
+| Prompt | What it does |
+|--------|-------------|
+| `/mcp:bruin-notes:daily_log` | Append a structured entry to today's daily note |
+| `/mcp:bruin-notes:research_capture` | Save a research note from any source or URL |
+| `/mcp:bruin-notes:weekly_review` | Query this week's notes and generate a review |
+| `/mcp:bruin-notes:link_knowledge` | Find and create wiki-links to build the graph |
+
+Or just ask Claude naturally: *"save my notes on this", "what did I research last week?", "link these ideas together"* — the skill handles it.
+
 ## MCP Server (60 Tools)
 
 Add to your agent's config (Claude Desktop, Claude Code, Cursor, etc.):
@@ -73,7 +104,9 @@ Or run from a local clone:
 | Workspaces & Tags | 8 | `create_workspace`, `bind_agent_workspace`, `list_tags`, `switch_workspace` |
 | Utilities & Export | 15 | `import_markdown`, `export_note_html`, `pin_note`, `get_setting`, `get_daily_note` |
 
-4 MCP resources: `bruin://notes`, `bruin://notes/{noteId}`, `bruin://tags`, `bruin://daily`
+**4 MCP Resources:** `bruin://notes`, `bruin://notes/{noteId}`, `bruin://tags`, `bruin://daily`
+
+**4 MCP Prompts:** `daily_log`, `research_capture`, `weekly_review`, `link_knowledge`
 
 ## Architecture
 
