@@ -1249,6 +1249,11 @@ function parseAgent(row: AgentRow): AgentWithCaps {
   };
 }
 
+export function getAgentByName(name: string): AgentWithCaps | null {
+  const row = db.prepare("SELECT * FROM agents WHERE name = ? AND is_active = 1").get(name) as AgentRow | undefined;
+  return row ? parseAgent(row) : null;
+}
+
 export function registerAgent(
   name: string,
   description = "",

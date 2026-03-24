@@ -21,11 +21,16 @@ Add to `~/.claude/claude_desktop_config.json` or Claude Desktop settings:
   "mcpServers": {
     "bruin": {
       "command": "npx",
-      "args": ["bruin-mcp-server"]
+      "args": ["bruin-mcp-server"],
+      "env": {
+        "BRUIN_AGENT_NAME": "claude-code"
+      }
     }
   }
 }
 ```
+
+`BRUIN_AGENT_NAME` auto-creates/restores your agent identity across sessions. All writes are attributed to this agent. Omit it for anonymous access.
 
 ## Core Workflow
 
