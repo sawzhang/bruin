@@ -1,9 +1,11 @@
 # Bruin
 
+**The note-taking app built for AI agents — 60 MCP tools, knowledge graph, human-in-the-loop review, all local-first.**
+
+> AI agents don't just answer questions. They should read, write, and organize your knowledge — with your approval.
+
 [![CI](https://github.com/sawzhang/bruin/actions/workflows/ci.yml/badge.svg)](https://github.com/sawzhang/bruin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-Agent-native markdown notes. AI agents read, write, and organize your knowledge through [MCP](https://modelcontextprotocol.io) — while you stay in control with human-in-the-loop review.
 
 **[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[Website](https://sawzhang.github.io/bruin/)**
 
@@ -11,12 +13,14 @@ Agent-native markdown notes. AI agents read, write, and organize your knowledge 
 
 ## Why Bruin
 
-Most note apps bolt on AI as an afterthought. Bruin is built from day one for AI agents:
+Every note app is adding "AI features" — a chatbot here, a summarizer there. Bruin takes the opposite approach: **the AI agent is a first-class citizen, not a bolt-on.**
 
-- **MCP-first** — 60 tools let any MCP-compatible agent (Claude, GPT, custom) do everything the GUI can
-- **Human-reviewed** — Notes flow through `draft → review → published`. Agents write, humans approve
-- **Local-first** — SQLite + iCloud sync. Your data never leaves your machine
-- **Knowledge graph** — `[[wiki-links]]` create a force-directed graph of connected ideas
+| Traditional Note Apps | Bruin |
+|----------------------|-------|
+| AI is a sidebar chatbot | AI agents have 60 MCP tools — full CRUD, search, tagging, workflows |
+| Notes are for humans only | Notes flow through `draft → review → published` — agents write, humans approve |
+| Cloud-dependent | Local-first SQLite + iCloud sync — your data never leaves your machine |
+| Flat file lists | Knowledge graph with `[[wiki-links]]`, backlinks, and force-directed visualization |
 
 ## Features
 
@@ -32,7 +36,7 @@ Most note apps bolt on AI as an afterthought. Bruin is built from day one for AI
 | **iCloud Sync** | Bidirectional sync with SHA-256 conflict resolution |
 | **6 Themes** | Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more |
 
-## MCP Server
+## MCP Server (60 Tools)
 
 Add to your agent's config (Claude Desktop, Claude Code, Cursor, etc.):
 
@@ -59,8 +63,6 @@ Or run from a local clone:
   }
 }
 ```
-
-60 tools across 6 categories:
 
 | Category | Count | Key tools |
 |----------|-------|-----------|
@@ -123,6 +125,14 @@ cd mcp-server && npm test               # MCP server (96 tests)
 cd src-tauri && cargo check             # Rust type check
 cd src-tauri && cargo clippy            # Rust lint
 ```
+
+## Roadmap
+
+- [ ] iOS / iPadOS companion app (read + quick capture)
+- [ ] Collaborative workspaces (multi-user, shared knowledge graphs)
+- [ ] Plugin system for custom MCP tool bundles
+- [ ] PDF / web clipper import with auto-tagging
+- [ ] End-to-end encryption for synced notes
 
 ## Releasing
 
