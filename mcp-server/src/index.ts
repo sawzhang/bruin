@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
+import { getAgentByName, registerAgent, setCurrentAgent } from "./db/queries.js";
 import { promises as fs } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -41,10 +42,21 @@ CLAUDE CODE SETUP
     "mcpServers": {
       "bruin": {
         "command": "npx",
-        "args": ["bruin-mcp-server"]
+        "args": ["bruin-mcp-server"],
+        "env": {
+          "BRUIN_AGENT_NAME": "claude-code"
+        }
       }
     }
   }
+
+PERSISTENT AGENT IDENTITY
+  Set BRUIN_AGENT_NAME (or BRUIN_AGENT_ID) to auto-restore agent context
+  across sessions. The agent is created in the DB on first run if it doesn't
+  exist yet, then reused on every subsequent connection.
+
+  BRUIN_AGENT_NAME=claude-code    Look up (or create) agent by name
+  BRUIN_AGENT_ID=<uuid>           Use exact agent UUID
 
 TOOLS  60 tools across: notes, search, knowledge graph, agents, tasks, webhooks, workspaces
 PROMPTS  /mcp:bruin-notes:daily_log | research_capture | weekly_review | link_knowledge
@@ -65,6 +77,27 @@ async function main() {
   if (arg === "--install-skill") {
     await installSkill();
     return;
+  }
+
+  // Auto-restore agent identity from environment variables
+  // BRUIN_AGENT_NAME: look up (or auto-create) an agent by name
+  // BRUIN_AGENT_ID: use exact UUID (must already exist in DB)
+  const agentName = process.env.BRUIN_AGENT_NAME;
+  const agentId = process.env.BRUIN_AGENT_ID;
+
+  if (agentName) {
+    const existing = getAgentByName(agentName);
+    if (existing) {
+      setCurrentAgent(existing.id);
+      process.stderr.write(`[bruin] agent restored: ${existing.name} (${existing.id})\n`);
+    } else {
+      const created = registerAgent(agentName, `Auto-registered via BRUIN_AGENT_NAME=${agentName}`);
+      setCurrentAgent(created.id);
+      process.stderr.write(`[bruin] agent created: ${created.name} (${created.id})\n`);
+    }
+  } else if (agentId) {
+    setCurrentAgent(agentId);
+    process.stderr.write(`[bruin] agent set via BRUIN_AGENT_ID: ${agentId}\n`);
   }
 
   const server = createServer();

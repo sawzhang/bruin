@@ -384,13 +384,22 @@ export function updateNote(
   id: string,
   title?: string,
   content?: string,
-  tags?: string[]
+  tags?: string[],
+  expectedUpdatedAt?: string  // Optimistic lock: if provided, rejects stale writes
 ): NoteWithTags | null {
   const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as
     | NoteRow
     | undefined;
 
   if (!existing) return null;
+
+  // Optimistic concurrency: reject if another writer already updated this note
+  if (expectedUpdatedAt && existing.updated_at !== expectedUpdatedAt) {
+    throw new Error(
+      `Conflict: note '${id}' was updated at ${existing.updated_at} (you expected ${expectedUpdatedAt}). ` +
+      `Re-read the note and retry with the current updated_at.`
+    );
+  }
 
   const newTitle = title ?? existing.title;
   const newContent = content ?? existing.content;
@@ -636,9 +645,11 @@ export function getBacklinks(
   }));
 }
 
-export function getDailyNote(date?: string): NoteWithTags {
+export function getDailyNote(date?: string, agentId?: string): NoteWithTags {
   const targetDate = date ?? new Date().toISOString().split("T")[0];
-  const title = targetDate;
+  // If an agent_id is provided, scope the daily note to that agent
+  // so multiple agents each have their own daily journal
+  const title = agentId ? `${targetDate} [${agentId}]` : targetDate;
 
   const existing = db
     .prepare("SELECT * FROM notes WHERE title = ? AND is_trashed = 0")
@@ -648,8 +659,10 @@ export function getDailyNote(date?: string): NoteWithTags {
     return { ...existing[0], tags: getTagsForNote(existing[0].id) };
   }
 
-  const content = `# ${targetDate}\n\n`;
-  return createNote(title, content, ["daily"]);
+  const agentSuffix = agentId ? ` — ${agentId}` : "";
+  const content = `# ${targetDate}${agentSuffix}\n\n`;
+  const tags = agentId ? ["daily", `agent/${agentId}`] : ["daily"];
+  return createNote(title, content, tags);
 }
 
 export function importMarkdownFiles(
@@ -1243,6 +1256,11 @@ function parseAgent(row: AgentRow): AgentWithCaps {
     capabilities: JSON.parse(row.capabilities || "[]"),
     is_active: row.is_active !== 0,
   };
+}
+
+export function getAgentByName(name: string): AgentWithCaps | null {
+  const row = db.prepare("SELECT * FROM agents WHERE name = ? AND is_active = 1").get(name) as AgentRow | undefined;
+  return row ? parseAgent(row) : null;
 }
 
 export function registerAgent(
