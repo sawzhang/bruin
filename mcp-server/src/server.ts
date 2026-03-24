@@ -105,19 +105,22 @@ export function createServer(): McpServer {
     {
       topic: z.string().optional().describe("Topic or task to log (e.g. 'Twitter research', 'code review', 'meeting notes')"),
       content: z.string().optional().describe("Content to log. If omitted, the prompt asks you to generate it."),
+      agent_id: z.string().optional().describe("Agent name for per-agent daily journal (e.g. 'claude-code'). Omit for shared daily note."),
     },
     async (args) => {
-      const daily = getDailyNote();
+      const agentId = args.agent_id ?? getCurrentAgent() ?? undefined;
+      const daily = getDailyNote(undefined, agentId);
       const topic = args.topic ?? "Daily Log";
       const contentHint = args.content
         ? `\nContent to append:\n${args.content}`
         : "\nGenerate a structured log entry for this topic.";
+      const agentNote = agentId ? ` (agent: ${agentId})` : "";
       return {
         messages: [{
           role: "user" as const,
           content: {
             type: "text" as const,
-            text: `Today's daily note (id: ${daily.id}, title: "${daily.title}"):\n\n${daily.content || "(empty)"}\n\nTask: Append a new section titled "## ${topic}" to this daily note.${contentHint}\n\nUse the append_to_note tool with note_id="${daily.id}".`,
+            text: `Today's daily note${agentNote} (id: ${daily.id}, title: "${daily.title}"):\n\n${daily.content || "(empty)"}\n\nTask: Append a new section titled "## ${topic}" to this daily note.${contentHint}\n\nUse the append_to_note tool with note_id="${daily.id}".`,
           },
         }],
       };
@@ -388,12 +391,13 @@ export function createServer(): McpServer {
 
   server.tool(
     "get_daily_note",
-    "Get or create today's daily note (or for a specific date). Used as an agent journal.",
+    "Get or create today's daily note (or for a specific date). Supports per-agent isolation so each agent has its own daily journal.",
     {
       date: z.string().optional().describe("Date in YYYY-MM-DD format. Defaults to today if omitted."),
+      agent_id: z.string().optional().describe("Agent name or ID for per-agent daily notes. If set, each agent gets its own journal (e.g. 'claude-code'). Omit for a shared daily note."),
     },
     async (args) => {
-      const note = getDailyNote(args.date);
+      const note = getDailyNote(args.date, args.agent_id);
       return text(note);
     }
   );
