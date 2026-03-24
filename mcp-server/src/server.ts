@@ -199,7 +199,7 @@ export function createServer(): McpServer {
 
   server.tool(
     "create_note",
-    "Create a new note in Bruin",
+    "Create a new note in Bruin. Embeddings are auto-generated in the background so the note is immediately available via semantic_search.",
     {
       title: z.string().describe("Title of the note"),
       content: z.string().describe("Markdown content of the note"),
@@ -208,6 +208,10 @@ export function createServer(): McpServer {
     async (args) => {
       const note = createNote(args.title, args.content, args.tags);
       notifyNotesListChanged();
+      // Auto-index embedding in the background (non-blocking)
+      generateEmbedding(`${note.title}\n\n${note.content}`)
+        .then((emb) => upsertNoteEmbedding(note.id, emb))
+        .catch(() => { /* non-fatal: reindex_embeddings can catch up */ });
       return text({ id: note.id, title: note.title, created_at: note.created_at, tags: note.tags });
     }
   );
@@ -240,6 +244,12 @@ export function createServer(): McpServer {
         const note = updateNote(args.note_id, args.title, args.content, args.tags, args.expected_updated_at);
         if (!note) return error(`Note '${args.note_id}' not found`);
         notifyNoteChanged(args.note_id);
+        // Re-index embedding in background when content changes
+        if (args.content !== undefined || args.title !== undefined) {
+          generateEmbedding(`${note.title}\n\n${note.content}`)
+            .then((emb) => upsertNoteEmbedding(note.id, emb))
+            .catch(() => { /* non-fatal */ });
+        }
         return text(note);
       } catch (e: unknown) {
         return error((e as Error).message);
