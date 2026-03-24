@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { generateEmbedding } from "./embeddings.js";
 import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, executeWorkflow, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces, unbindAgentWorkspace, updateAgent, deactivateAgent, deleteWorkflowTemplate, pinNote, restoreNote, getSetting, setSetting, getAllSettings, exportNoteMarkdown, exportNoteHtml } from "./db/queries.js";
 
 function text(data: unknown) {
@@ -579,37 +580,53 @@ export function createServer(): McpServer {
 
   server.tool(
     "semantic_search",
-    "Search notes by meaning using vector embeddings. Requires embeddings to be generated first via reindex_embeddings.",
+    "Search notes by meaning using the all-MiniLM-L6-v2 model. Pass a plain text query — embeddings are generated automatically.",
     {
-      query_embedding: z.array(z.number()).describe("384-dimensional embedding vector of the search query"),
+      query: z.string().describe("Plain text search query — the model converts it to a vector automatically"),
       limit: z.number().optional().describe("Max results (default 10)"),
-      min_similarity: z.number().optional().describe("Minimum cosine similarity threshold (default 0.3)"),
+      min_similarity: z.number().optional().describe("Minimum cosine similarity threshold 0–1 (default 0.3)"),
     },
     async (args) => {
-      const results = semanticSearch(args.query_embedding, args.limit ?? 10, args.min_similarity ?? 0.3);
+      const embedding = await generateEmbedding(args.query);
+      const results = semanticSearch(embedding, args.limit ?? 10, args.min_similarity ?? 0.3);
       return text({ count: results.length, results });
     }
   );
 
   server.tool(
     "reindex_embeddings",
-    "Generate and store embeddings for all notes (or a specific note). Uses the all-MiniLM-L6-v2 model. Note: This is a placeholder that stores the embedding you provide.",
+    "Generate and store embeddings for all un-indexed notes (or a specific note) using the all-MiniLM-L6-v2 model. Run once after installing Bruin, then after bulk imports.",
     {
-      note_id: z.string().optional().describe("Specific note ID to reindex. If omitted, returns all note IDs that need reindexing."),
-      embedding: z.array(z.number()).optional().describe("The 384-dimensional embedding vector to store for the note"),
+      note_id: z.string().optional().describe("Specific note ID to reindex. If omitted, indexes all notes that don't have embeddings yet."),
     },
     async (args) => {
-      if (args.note_id && args.embedding) {
-        upsertNoteEmbedding(args.note_id, args.embedding);
-        return text({ message: `Embedding stored for note '${args.note_id}'` });
+      if (args.note_id) {
+        const note = getNote(args.note_id);
+        if (!note) return error(`Note '${args.note_id}' not found`);
+        const embedding = await generateEmbedding(`${note.title}\n\n${note.content}`);
+        upsertNoteEmbedding(args.note_id, embedding);
+        return text({ indexed: 1, note_id: args.note_id, message: "Embedding generated and stored." });
       }
 
-      // Return notes that need embeddings
+      // Batch index all notes missing embeddings
       const allNotes = listNotes(undefined, 1000, 0);
       const existing = getAllEmbeddings();
       const existingIds = new Set(existing.map((e) => e.note_id));
-      const needsEmbedding = allNotes.filter((n) => !existingIds.has(n.id));
-      return text({ total_notes: allNotes.length, indexed: existing.length, needs_indexing: needsEmbedding.length, note_ids: needsEmbedding.map((n) => n.id) });
+      const needsIndexing = allNotes.filter((n) => !existingIds.has(n.id));
+
+      if (needsIndexing.length === 0) {
+        return text({ total_notes: allNotes.length, indexed: existing.length, newly_indexed: 0, message: "All notes already indexed." });
+      }
+
+      let indexed = 0;
+      for (const summary of needsIndexing) {
+        const note = getNote(summary.id);
+        if (!note) continue;
+        const embedding = await generateEmbedding(`${note.title}\n\n${note.content}`);
+        upsertNoteEmbedding(note.id, embedding);
+        indexed++;
+      }
+      return text({ total_notes: allNotes.length, previously_indexed: existing.length, newly_indexed: indexed, message: `Indexed ${indexed} notes.` });
     }
   );
 
