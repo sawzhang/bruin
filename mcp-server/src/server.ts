@@ -96,6 +96,103 @@ export function createServer(): McpServer {
     }
   );
 
+  // --- MCP Prompts: reusable agent workflow templates ---
+
+  server.prompt(
+    "daily_log",
+    "Start or continue today's daily log — get today's note and append a structured entry",
+    {
+      topic: z.string().optional().describe("Topic or task to log (e.g. 'Twitter research', 'code review', 'meeting notes')"),
+      content: z.string().optional().describe("Content to log. If omitted, the prompt asks you to generate it."),
+    },
+    async (args) => {
+      const daily = getDailyNote();
+      const topic = args.topic ?? "Daily Log";
+      const contentHint = args.content
+        ? `\nContent to append:\n${args.content}`
+        : "\nGenerate a structured log entry for this topic.";
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Today's daily note (id: ${daily.id}, title: "${daily.title}"):\n\n${daily.content || "(empty)"}\n\nTask: Append a new section titled "## ${topic}" to this daily note.${contentHint}\n\nUse the append_to_note tool with note_id="${daily.id}".`,
+          },
+        }],
+      };
+    }
+  );
+
+  server.prompt(
+    "research_capture",
+    "Create a structured research note from a source (URL, text, or topic)",
+    {
+      topic: z.string().describe("Research topic or title"),
+      source: z.string().optional().describe("Source URL or reference"),
+      raw_content: z.string().optional().describe("Raw content to structure and save"),
+    },
+    async (args) => {
+      const today = new Date().toISOString().split("T")[0];
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Create a research note in Bruin.\n\nTopic: ${args.topic}\nDate: ${today}${args.source ? `\nSource: ${args.source}` : ""}${args.raw_content ? `\n\nRaw content:\n${args.raw_content}` : ""}\n\nStructure the note as:\n- ## Summary (3-5 bullet points)\n- ## Key Points\n- ## Raw Notes\n- ## References\n\nTags to use: #research, plus topic-specific tags.\n\nUse create_note with an appropriate title like "${args.topic} — ${today}".`,
+          },
+        }],
+      };
+    }
+  );
+
+  server.prompt(
+    "weekly_review",
+    "Generate a weekly review by querying this week's notes and summarizing activity",
+    {
+      week_start: z.string().optional().describe("Week start date (YYYY-MM-DD). Defaults to last Monday."),
+    },
+    async (args) => {
+      const today = new Date();
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - today.getDay() + 1);
+      const weekStart = args.week_start ?? monday.toISOString().split("T")[0];
+      const weekEnd = today.toISOString().split("T")[0];
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Generate a weekly review for the week of ${weekStart} to ${weekEnd}.\n\nSteps:\n1. Use advanced_query with date_from="${weekStart}" and date_to="${weekEnd}" to get all notes from this week\n2. Use advanced_query with tags=["daily"] to get daily logs\n3. Summarize: what was researched, what was completed, key insights, recurring themes\n4. Create a new note titled "Weekly Review ${weekStart}" with tags: #weekly-review, #review\n5. Include links to the most important notes using [[wiki-link]] syntax`,
+          },
+        }],
+      };
+    }
+  );
+
+  server.prompt(
+    "link_knowledge",
+    "Find and create wiki-links between related notes to build the knowledge graph",
+    {
+      note_id: z.string().optional().describe("Note ID to find connections for. If omitted, searches recent notes."),
+    },
+    async (args) => {
+      let context = "";
+      if (args.note_id) {
+        const note = getNote(args.note_id);
+        if (note) context = `Focus note: "${note.title}" (id: ${note.id})\nContent preview: ${note.content.slice(0, 300)}...`;
+      }
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Build knowledge graph connections in Bruin.\n\n${context || "Start with recent notes using list_notes."}\n\nSteps:\n1. Read the target note(s)\n2. Use search_notes or semantic_search to find related notes by concept\n3. Use get_backlinks to see existing connections\n4. Update notes to add [[wiki-links]] where meaningful connections exist\n5. Report: how many links were added and what knowledge clusters emerged`,
+          },
+        }],
+      };
+    }
+  );
+
   server.tool(
     "create_note",
     "Create a new note in Bruin",
