@@ -18,8 +18,13 @@ cd src-tauri && cargo check    # Type check Rust
 cd src-tauri && cargo clippy   # Lint Rust
 
 # MCP server
-cd mcp-server && npm run build # Build TypeScript
-cd mcp-server && npm test      # Run tests
+cd mcp-server && npm install   # Install deps (required before build)
+cd mcp-server && npm run build # Build TypeScript → dist/
+cd mcp-server && npm test      # Run 96 tests (Vitest)
+
+# MCP server CLI
+npx bruin-mcp-server --help           # Show setup instructions
+npx bruin-mcp-server --install-skill  # Install Claude Code skill to ~/.claude/skills/
 ```
 
 ## Architecture
@@ -35,7 +40,7 @@ AI Agent ──MCP (stdio)──► MCP Server (Node.js) ──► SQLite ◄─
                                               (bidirectional .md files)
 ```
 
-All three processes (Tauri app, MCP server, iCloud sync) share the same SQLite database at `~/Library/Application Support/com.bruin.app/bruin.db`. The MCP server notifies Tauri of changes by writing a trigger file that Tauri's file watcher detects.
+All three processes share the same SQLite database at `~/Library/Application Support/com.bruin.app/bruin.db`. The MCP server notifies Tauri of changes by writing a trigger file that Tauri's file watcher detects.
 
 ### Frontend (src/)
 
@@ -48,35 +53,52 @@ All three processes (Tauri app, MCP server, iCloud sync) share the same SQLite d
 ### Backend (src-tauri/src/)
 
 - **Commands**: `commands/*.rs` — each file is a group of `#[tauri::command]` handlers. Registered in `lib.rs` via `generate_handler![]`.
-- **Database**: `db/migrations.rs` — 8-phase migration system. Schema includes: `notes`, `tags`, `note_tags`, `notes_fts` (FTS5), `activity_events`, `templates`, `webhooks`, `workspaces`, `note_links` (knowledge graph), `note_embeddings`.
+- **Database**: `db/migrations.rs` — 8-phase migration system. Schema includes: `notes`, `tags`, `note_tags`, `notes_fts` (FTS5), `activity_events`, `templates`, `webhooks`, `workspaces`, `note_links` (knowledge graph), `note_embeddings`, `agents`, `tasks`, `workflow_templates`.
 - **Sync**: `sync/` — three layers: `icloud.rs` (file I/O, hash computation), `reconciler.rs` (merge strategy using SHA-256 + last-write-wins), `watcher.rs` (notify crate with debounced events).
 - **DB access pattern**: All commands receive `State<'_, Mutex<Connection>>` via Tauri managed state. Lock the mutex, do work, return `Result<T, String>`.
 
 ### MCP Server (mcp-server/)
 
-- `server.ts` — registers 14 tools + 4 resources with `@modelcontextprotocol/sdk`.
-- `db/queries.ts` — all database operations (~1000 LOC). Uses `better-sqlite3` for synchronous access.
-- Tools in `tools/` each export a handler function.
+- `src/server.ts` — registers **60 tools + 4 resources + 4 prompts** with `@modelcontextprotocol/sdk`.
+- `src/db/queries.ts` — all database operations (~1100 LOC). Uses `better-sqlite3` for synchronous access.
+- `src/embeddings.ts` — local embedding generation using `@huggingface/transformers` (all-MiniLM-L6-v2, 384-dim).
+- `src/index.ts` — CLI entry point. Handles `--help`, `--install-skill`, and agent auto-restore from env vars.
+- `src/tools/` — individual tool handler files.
 - After writes, calls `notifyTauri()` which writes `.bruin-sync-trigger` to wake Tauri's watcher.
+
+**MCP Primitives:**
+- **60 Tools** across: notes/search, knowledge graph, agent registry, workspaces, tasks, workflows, webhooks, settings/export, utility
+- **4 Resources**: `bruin://notes`, `bruin://notes/{id}`, `bruin://tags`, `bruin://daily`
+- **4 Prompts**: `daily_log`, `research_capture`, `weekly_review`, `link_knowledge`
 
 ### Key patterns
 
-- **Note states**: `draft → review → published`. Agents write drafts, humans review and publish.
-- **Activity logging**: Every note mutation calls `log_activity()` which inserts into `activity_events` and fires webhooks (HMAC-SHA256 signed, async with retry).
+- **Note states**: `draft → review → published`. Valid transitions: `draft→review`, `review→published`, `review→draft`, `published→review`.
+- **Activity logging**: Every note mutation calls `logActivity()` which inserts into `activity_events` and fires webhooks (HMAC-SHA256 signed, async with retry). The `currentAgentId` in-memory state attributes writes to the active agent.
 - **Tag hierarchy**: Tags like `#project/bruin/v2` are stored flat in `tags.name` with `parent_name` tracking the hierarchy.
 - **Wiki-links**: `[[Note Title]]` syntax creates entries in `note_links` table. Parsed during `sync_note_links()`.
 - **UTF-8 safe slicing**: When truncating content for previews, always use `is_char_boundary()` loop before slicing (multi-byte characters like Chinese/emoji will panic otherwise).
 - **Sync state**: `SyncState` (managed Tauri state) must be updated after any sync path — startup reconcile, watcher events, and manual trigger — or the UI shows "Not synced".
+- **Optimistic locking**: `updateNote()` accepts `expectedUpdatedAt`. If the note was updated by another writer since the caller last read it, the write throws a conflict error. MCP tool exposes this as `expected_updated_at`.
+- **Auto-embedding**: `create_note` and `update_note` fire-and-forget `generateEmbedding()` in the background. `reindex_embeddings` tool catches up any notes that missed this.
+- **Per-agent daily notes**: `getDailyNote(date?, agentId?)` scopes the daily note to the agent when `agentId` is provided (title: `YYYY-MM-DD [agentId]`, tagged `#agent/<agentId>`).
+- **Persistent agent identity**: MCP server reads `BRUIN_AGENT_NAME` (or `BRUIN_AGENT_ID`) env var on startup and calls `setCurrentAgent()`. Agent is auto-created if name is new. All subsequent writes are attributed to this agent without needing `register_agent` or `set_current_agent` in every session.
 
 ## Database
 
 SQLite with WAL mode. FTS5 virtual table `notes_fts` auto-syncs via triggers. Migrations run sequentially on app startup in `db/migrations.rs`. Add new migrations as the next phase number.
 
-The MCP server accesses the same database file. Both use WAL mode for concurrent reads.
+The MCP server accesses the same database file. Both use WAL mode for concurrent reads. Concurrent writes to the same note should use `expected_updated_at` optimistic locking.
 
 ## iCloud Sync
 
-Notes sync as individual `.md` files with YAML frontmatter to `~/Library/Mobile Documents/com~apple~CloudDocs/Bruin/notes/`. The reconciler compares SHA-256 hashes of `title+content` to detect changes, with `updated_at` as tiebreaker for conflicts.
+Notes sync as individual `.md` files with YAML frontmatter to `~/Library/Mobile Documents/iCloud~com~bruin~app/Documents/notes/`. The reconciler compares SHA-256 hashes of `title+content` to detect changes, with `updated_at` as tiebreaker for conflicts.
+
+## External Documentation
+
+Full MCP tool reference and user-facing install guide: **https://bruin.me/skills.md**
+
+This URL is designed to be read by AI agents (Claude, etc.) to understand Bruin and help users install it.
 
 ## Releasing
 
@@ -90,7 +112,7 @@ Update `CHANGELOG.md` with new entries under `## [x.y.z] - YYYY-MM-DD`, followin
 Release is fully automated — push a `v*` tag and GitHub Actions builds + publishes:
 
 ```bash
-git tag v0.2.0
+git tag v1.0.0
 git push origin master --tags
 ```
 

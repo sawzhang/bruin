@@ -58,7 +58,7 @@
         <a href="#features">Features</a>
         <a href="#mcp">MCP</a>
         <a href="#claude-code">Claude Code</a>
-        <a href="#architecture">How It Works</a>
+        <a href="skills.md" target="_blank">Skills</a>
         <a href="https://github.com/sawzhang/bruin" target="_blank" rel="noopener">GitHub</a>
       </div>
       <a href="#download" class="nav-cta">Download</a>
@@ -80,10 +80,17 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Download for Mac
       </a>
-      <a href="#mcp" class="btn btn-ghost">
+      <a href="#claude-code" class="btn btn-ghost">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
-        MCP Server Docs
+        Claude Code Setup
       </a>
+    </div>
+    <!-- One-liner CTA -->
+    <div style="margin-top:2rem;max-width:560px;margin-left:auto;margin-right:auto;">
+      <div style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:.85rem 1.2rem;font-size:.82rem;line-height:1.5;text-align:left;">
+        <span style="opacity:.45;font-size:.7rem;display:block;margin-bottom:.35rem;letter-spacing:.06em;text-transform:uppercase;">Tell Claude Code</span>
+        <code style="color:var(--accent);">Read https://bruin.me/skills.md and help me install Bruin.</code>
+      </div>
     </div>
 
     <!-- App Window Mockup -->
@@ -734,70 +741,89 @@
     </div>
   </section>
 
-  <!-- ==================== DOWNLOAD ==================== -->
   <!-- ==================== CLAUDE CODE INTEGRATION ==================== -->
   <section id="claude-code" class="more-features" style="border-top: 1px solid var(--border);">
     <div class="container">
-      <div class="section-label">Claude Code Integration</div>
-      <h2 class="section-title">One command to understand everything</h2>
-      <p class="section-subtitle">Install the Bruin skill and Claude knows your entire knowledge base — tools, workflows, MCP prompts — natively.</p>
+      <div class="section-label">Claude Code &amp; OpenClaw</div>
+      <h2 class="section-title">One sentence to install and use</h2>
+      <p class="section-subtitle">Tell Claude Code this and it handles everything — MCP config, skill install, and your first note.</p>
 
-      <div class="code-tabs" style="max-width:720px;margin:2.5rem auto 0;">
-
-        <div style="margin-bottom:2rem;">
-          <div class="code-label" style="font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.55;margin-bottom:.5rem;">Step 1 — Install skill (once)</div>
-          <div class="code-block">
-            <pre><code>npx bruin-mcp-server --install-skill</code></pre>
-          </div>
-          <p style="font-size:.85rem;opacity:.6;margin-top:.5rem;">Copies <code>bruin.md</code> to <code>~/.claude/skills/</code>. Claude now understands Bruin natively across all sessions.</p>
+      <!-- Hero one-liner -->
+      <div style="max-width:680px;margin:2rem auto;">
+        <div class="code-block" style="border:1px solid var(--accent);border-radius:10px;padding:1.25rem 1.5rem;background:var(--surface-2);">
+          <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;opacity:.45;margin-bottom:.6rem;">Say this to Claude Code / OpenClaw</div>
+          <pre style="margin:0;font-size:1rem;line-height:1.5;"><code>Read https://bruin.me/skills.md and help me install and set up Bruin.</code></pre>
         </div>
+        <p style="font-size:.85rem;opacity:.55;text-align:center;margin-top:.75rem;">
+          Claude fetches the skills reference, walks you through setup, and starts using your knowledge base.
+        </p>
+      </div>
 
-        <div style="margin-bottom:2rem;">
-          <div class="code-label" style="font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.55;margin-bottom:.5rem;">Step 2 — Add MCP server to Claude Code</div>
+      <!-- Manual setup steps -->
+      <div class="code-tabs" style="max-width:680px;margin:2.5rem auto 0;">
+        <div style="font-size:.8rem;font-weight:600;opacity:.5;text-align:center;margin-bottom:1.5rem;letter-spacing:.06em;text-transform:uppercase;">Or set up manually</div>
+
+        <div style="margin-bottom:1.75rem;">
+          <div class="code-label" style="font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.5;margin-bottom:.5rem;">1 — MCP config (~/.claude.json)</div>
           <div class="code-block">
             <pre><code>{
   "mcpServers": {
     "bruin": {
       "command": "npx",
-      "args": ["bruin-mcp-server"]
+      "args": ["bruin-mcp-server"],
+      "env": { "BRUIN_AGENT_NAME": "claude-code" }
     }
   }
 }</code></pre>
           </div>
         </div>
 
-        <div style="margin-bottom:2rem;">
-          <div class="code-label" style="font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.55;margin-bottom:.5rem;">Step 3 — Use MCP Prompts directly</div>
+        <div style="margin-bottom:1.75rem;">
+          <div class="code-label" style="font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.5;margin-bottom:.5rem;">2 — Install skill (once, persists across sessions)</div>
+          <div class="code-block">
+            <pre><code>npx bruin-mcp-server --install-skill</code></pre>
+          </div>
+        </div>
+
+        <div style="margin-bottom:1.75rem;">
+          <div class="code-label" style="font-size:.72rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;opacity:.5;margin-bottom:.5rem;">3 — Use MCP Prompts</div>
           <div class="code-block">
             <pre><code>/mcp:bruin-notes:daily_log
-/mcp:bruin-notes:research_capture topic="AI Agent frameworks"
+/mcp:bruin-notes:research_capture topic="AI frameworks"
 /mcp:bruin-notes:weekly_review
 /mcp:bruin-notes:link_knowledge</code></pre>
           </div>
         </div>
       </div>
 
-      <div class="features-grid" style="margin-top:2.5rem;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.25rem;">
-        <div class="feature-card" style="padding:1.25rem;">
-          <div class="feature-icon">📋</div>
-          <h3 style="font-size:.95rem;">4 MCP Prompts</h3>
-          <p style="font-size:.82rem;">daily_log · research_capture · weekly_review · link_knowledge</p>
+      <!-- Capability chips -->
+      <div class="features-grid" style="margin-top:2rem;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1rem;">
+        <div class="feature-card" style="padding:1.1rem;">
+          <div class="feature-icon" style="font-size:1.2rem;">📖</div>
+          <h3 style="font-size:.9rem;margin:.4rem 0 .3rem;">skills.md</h3>
+          <p style="font-size:.8rem;opacity:.65;">Machine-readable reference at bruin.me/skills.md — one URL Claude needs to know everything</p>
         </div>
-        <div class="feature-card" style="padding:1.25rem;">
-          <div class="feature-icon">📦</div>
-          <h3 style="font-size:.95rem;">4 MCP Resources</h3>
-          <p style="font-size:.82rem;">bruin://notes · bruin://tags · bruin://daily · bruin://notes/{"{id}"}</p>
+        <div class="feature-card" style="padding:1.1rem;">
+          <div class="feature-icon" style="font-size:1.2rem;">💬</div>
+          <h3 style="font-size:.9rem;margin:.4rem 0 .3rem;">4 MCP Prompts</h3>
+          <p style="font-size:.8rem;opacity:.65;">daily_log · research_capture · weekly_review · link_knowledge</p>
         </div>
-        <div class="feature-card" style="padding:1.25rem;">
-          <div class="feature-icon">🔧</div>
-          <h3 style="font-size:.95rem;">60 MCP Tools</h3>
-          <p style="font-size:.82rem;">Full CRUD · semantic search · knowledge graph · agent registry</p>
+        <div class="feature-card" style="padding:1.1rem;">
+          <div class="feature-icon" style="font-size:1.2rem;">🔧</div>
+          <h3 style="font-size:.9rem;margin:.4rem 0 .3rem;">60 MCP Tools</h3>
+          <p style="font-size:.8rem;opacity:.65;">Full CRUD · semantic search · knowledge graph · agent registry · tasks</p>
         </div>
-        <div class="feature-card" style="padding:1.25rem;">
-          <div class="feature-icon">🧠</div>
-          <h3 style="font-size:.95rem;">Skill File</h3>
-          <p style="font-size:.82rem;">Claude understands Bruin patterns, tags, and workflows across every session</p>
+        <div class="feature-card" style="padding:1.1rem;">
+          <div class="feature-icon" style="font-size:1.2rem;">🤖</div>
+          <h3 style="font-size:.9rem;margin:.4rem 0 .3rem;">Agent Identity</h3>
+          <p style="font-size:.8rem;opacity:.65;"><code>BRUIN_AGENT_NAME</code> persists your agent across restarts. All writes attributed.</p>
         </div>
+      </div>
+
+      <div style="text-align:center;margin-top:2rem;">
+        <a href="skills.md" target="_blank" rel="noopener" class="btn btn-ghost" style="font-size:.9rem;">
+          View full skills.md reference →
+        </a>
       </div>
     </div>
   </section>
@@ -805,7 +831,7 @@
   <section id="download" class="download">
     <div class="container">
       <h2>Get Bruin</h2>
-      <p>Free and open source, v0.4.0. Download for macOS (Apple Silicon &amp; Intel) or build from source.</p>
+      <p>Free and open source, v1.0.0. Download for macOS (Apple Silicon &amp; Intel) or build from source.</p>
       <div class="download-actions">
         <a href="https://github.com/sawzhang/bruin/releases/latest" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
@@ -831,9 +857,10 @@
       </div>
       <div class="footer-links">
         <a href="#features">Features</a>
-        <a href="#mcp">MCP Docs</a>
+        <a href="#mcp">MCP</a>
+        <a href="#claude-code">Claude Code</a>
+        <a href="skills.md" target="_blank" rel="noopener">skills.md</a>
         <a href="https://github.com/sawzhang/bruin" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/sawzhang/bruin/issues" target="_blank" rel="noopener">Issues</a>
         <a href="privacy.html">Privacy</a>
       </div>
       <div class="footer-copy">

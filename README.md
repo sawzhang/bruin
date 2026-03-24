@@ -1,112 +1,115 @@
 # Bruin
 
-**The note-taking app built for AI agents — 60 MCP tools, knowledge graph, human-in-the-loop review, all local-first.**
+**The note-taking app built for AI agents — local-first, MCP-native, human-in-the-loop.**
 
 > AI agents don't just answer questions. They should read, write, and organize your knowledge — with your approval.
 
 [![CI](https://github.com/sawzhang/bruin/actions/workflows/ci.yml/badge.svg)](https://github.com/sawzhang/bruin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[Website](https://bruin.me)**
+**[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[bruin.me](https://bruin.me)**
 
-> If macOS shows "app is damaged", run: `xattr -cr /Applications/Bruin.app`
+> If macOS shows "app is damaged": `xattr -cr /Applications/Bruin.app`
 
-## Why Bruin
+---
 
-Every note app is adding "AI features" — a chatbot here, a summarizer there. Bruin takes the opposite approach: **the AI agent is a first-class citizen, not a bolt-on.**
+## Quick Start — Claude Code / OpenClaw
 
-| Traditional Note Apps | Bruin |
-|----------------------|-------|
-| AI is a sidebar chatbot | AI agents have 60 MCP tools — full CRUD, search, tagging, workflows |
-| Notes are for humans only | Notes flow through `draft → review → published` — agents write, humans approve |
-| Cloud-dependent | Local-first SQLite + iCloud sync — your data never leaves your machine |
-| Flat file lists | Knowledge graph with `[[wiki-links]]`, backlinks, and force-directed visualization |
+**Tell Claude this one sentence:**
 
-## Features
-
-| Area | What you get |
-|------|--------------|
-| **Editor** | TipTap markdown with syntax highlighting, tables, images, slash commands |
-| **Search** | FTS5 full-text + semantic search with local Hugging Face embeddings |
-| **Knowledge Graph** | D3 force-directed visualization, backlinks, BFS traversal |
-| **Agent Registry** | Register, track, and audit every agent that touches your notes |
-| **Task Management** | Create, assign, and track tasks linked to notes and agents |
-| **Workflow Templates** | Multi-step agent automation with variable interpolation |
-| **Webhooks** | HMAC-SHA256 signed callbacks with delivery logs and retry |
-| **iCloud Sync** | Bidirectional sync with SHA-256 conflict resolution |
-| **6 Themes** | Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more |
-
-## Claude Code Integration
-
-**One command to make Claude natively understand Bruin:**
-
-```bash
-npx bruin-mcp-server --install-skill
+```
+Read https://bruin.me/skills.md and help me install and set up Bruin.
 ```
 
-Installs `.claude/skills/bruin.md` to `~/.claude/skills/`. Claude now knows your entire knowledge base — 60 tools, MCP prompts, tag conventions, and common workflows — across every session.
+Claude will read the skills file, walk you through adding the MCP config, and start using your knowledge base immediately.
 
-Then add the MCP server to Claude Code settings:
+**Or set up manually in 2 steps:**
 
-```json
-{
-  "mcpServers": {
-    "bruin": { "command": "npx", "args": ["bruin-mcp-server"] }
-  }
-}
-```
-
-Use MCP Prompts directly in Claude Code:
-
-| Prompt | What it does |
-|--------|-------------|
-| `/mcp:bruin-notes:daily_log` | Append a structured entry to today's daily note |
-| `/mcp:bruin-notes:research_capture` | Save a research note from any source or URL |
-| `/mcp:bruin-notes:weekly_review` | Query this week's notes and generate a review |
-| `/mcp:bruin-notes:link_knowledge` | Find and create wiki-links to build the graph |
-
-Or just ask Claude naturally: *"save my notes on this", "what did I research last week?", "link these ideas together"* — the skill handles it.
-
-## MCP Server (60 Tools)
-
-Add to your agent's config (Claude Desktop, Claude Code, Cursor, etc.):
+**1. Add to your MCP config** (`~/.claude.json` or Claude Desktop settings):
 
 ```json
 {
   "mcpServers": {
     "bruin": {
       "command": "npx",
-      "args": ["bruin-mcp-server"]
+      "args": ["bruin-mcp-server"],
+      "env": { "BRUIN_AGENT_NAME": "claude-code" }
     }
   }
 }
 ```
 
-Or run from a local clone:
+**2. Install the Claude Code skill** (makes Claude natively understand Bruin across all sessions):
 
-```json
-{
-  "mcpServers": {
-    "bruin": {
-      "command": "node",
-      "args": ["<path-to-bruin>/mcp-server/dist/index.js"]
-    }
-  }
-}
+```bash
+npx bruin-mcp-server --install-skill
 ```
+
+That's it. Claude can now write notes, run daily logs, do research capture, build knowledge graphs, and more — all through natural conversation.
+
+---
+
+## What Makes Bruin Different
+
+| Traditional Note Apps | Bruin |
+|----------------------|-------|
+| AI is a sidebar chatbot | AI agents have 60 MCP tools — full CRUD, search, tagging, workflows |
+| Notes are for humans only | Notes flow through `draft → review → published` — agents write, humans approve |
+| Cloud-dependent | Local-first SQLite + iCloud sync — your data never leaves your machine |
+| Flat file lists | Knowledge graph with `[[wiki-links]]`, backlinks, force-directed visualization |
+
+---
+
+## MCP Primitives
+
+### 4 Prompts — Invoke directly in Claude Code
+
+```
+/mcp:bruin-notes:daily_log                                  # Append to today's log
+/mcp:bruin-notes:research_capture topic="AI frameworks"     # Save research from any source
+/mcp:bruin-notes:weekly_review                              # Summarize the week's notes
+/mcp:bruin-notes:link_knowledge note_id="<id>"             # Build wiki-links between notes
+```
+
+### 4 Resources — Reference with @bruin
+
+| Resource | Contents |
+|---------|---------|
+| `bruin://notes` | All notes list |
+| `bruin://notes/{id}` | Single note content |
+| `bruin://tags` | All tags with counts |
+| `bruin://daily` | Today's daily note |
+
+### 60 Tools — Full reference at [bruin.me/skills.md](https://bruin.me/skills.md)
 
 | Category | Count | Key tools |
 |----------|-------|-----------|
-| Notes & Search | 16 | `create_note`, `search_notes`, `semantic_search`, `advanced_query`, `get_backlinks` |
-| Agent Registry | 6 | `register_agent`, `update_agent`, `deactivate_agent`, `get_agent_audit_log` |
-| Tasks & Workflows | 10 | `create_task`, `assign_task`, `execute_workflow`, `create_workflow_template` |
-| Webhooks | 5 | `register_webhook`, `test_webhook`, `get_webhook_logs` |
-| Workspaces & Tags | 8 | `create_workspace`, `bind_agent_workspace`, `list_tags`, `switch_workspace` |
-| Utilities & Export | 15 | `import_markdown`, `export_note_html`, `pin_note`, `get_setting`, `get_daily_note` |
+| Notes & Search | 16 | `create_note`, `append_to_note`, `search_notes`, `semantic_search`, `advanced_query` |
+| Knowledge Graph | 3 | `get_knowledge_graph`, `get_forward_links`, `get_backlinks` |
+| Agent Registry | 6 | `register_agent`, `get_agent_audit_log`, `set_current_agent` |
+| Workspaces | 7 | `create_workspace`, `bind_agent_workspace`, `switch_workspace` |
+| Tasks & Workflows | 10 | `create_task`, `assign_task`, `create_workflow_template`, `execute_workflow` |
+| Webhooks | 6 | `register_webhook`, `test_webhook`, `get_webhook_logs` |
+| Settings & Export | 5 | `get_setting`, `export_note_markdown`, `export_note_html` |
+| Utility | 3 | `pin_note`, `restore_note`, `list_tags` |
 
-**4 MCP Resources:** `bruin://notes`, `bruin://notes/{noteId}`, `bruin://tags`, `bruin://daily`
+---
 
-**4 MCP Prompts:** `daily_log`, `research_capture`, `weekly_review`, `link_knowledge`
+## Features
+
+| Area | What you get |
+|------|--------------|
+| **Editor** | TipTap markdown with syntax highlighting, tables, images, slash commands |
+| **Search** | FTS5 full-text + semantic search (all-MiniLM-L6-v2, auto-indexed) |
+| **Knowledge Graph** | D3 force-directed visualization, backlinks, BFS traversal |
+| **Agent Registry** | Register, track, and audit every agent that touches your notes |
+| **Task Management** | Create, assign, and track tasks linked to notes and agents |
+| **Workflow Templates** | Multi-step agent automation with variable chaining |
+| **Webhooks** | HMAC-SHA256 signed callbacks with delivery logs and retry |
+| **iCloud Sync** | Bidirectional sync with SHA-256 conflict resolution |
+| **6 Themes** | Dark Graphite, Charcoal, Solarized, Nord, Dracula, and more |
+
+---
 
 ## Architecture
 
@@ -117,16 +120,18 @@ AI Agent ──MCP (stdio)──► MCP Server (Node.js) ──► SQLite ◄─
                                               (bidirectional .md files)
 ```
 
-All three processes share the same SQLite database. The MCP server notifies the Tauri app of changes via a trigger file that the file watcher detects.
+All three processes share the same SQLite database at `~/Library/Application Support/com.bruin.app/bruin.db`. The MCP server notifies the Tauri app of changes via a trigger file that the file watcher detects.
 
 | Layer | Technology |
 |-------|-----------|
 | Desktop Shell | Tauri 2 |
 | Backend | Rust, SQLite (WAL + FTS5), rusqlite |
 | Frontend | React 19, TipTap, Zustand, D3 |
-| Agent Protocol | MCP SDK (TypeScript) |
-| Embeddings | @huggingface/transformers (all-MiniLM-L6-v2) |
+| Agent Protocol | MCP SDK (TypeScript) — Tools + Resources + Prompts |
+| Embeddings | @huggingface/transformers (all-MiniLM-L6-v2, local) |
 | Sync | iCloud Drive + notify file watcher |
+
+---
 
 ## Development
 
@@ -153,11 +158,13 @@ npm run tauri build        # → .dmg in src-tauri/target/release/bundle/
 ### Tests
 
 ```bash
-npm test                                # Frontend (Vitest)
-cd mcp-server && npm test               # MCP server (96 tests)
-cd src-tauri && cargo check             # Rust type check
-cd src-tauri && cargo clippy            # Rust lint
+npm test                        # Frontend (Vitest)
+cd mcp-server && npm test       # MCP server (96 tests)
+cd src-tauri && cargo check     # Rust type check
+cd src-tauri && cargo clippy    # Rust lint
 ```
+
+---
 
 ## Roadmap
 
@@ -167,16 +174,20 @@ cd src-tauri && cargo clippy            # Rust lint
 - [ ] PDF / web clipper import with auto-tagging
 - [ ] End-to-end encryption for synced notes
 
+---
+
 ## Releasing
 
 Version is tracked in three files (keep in sync): `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`.
 
 ```bash
-git tag v0.4.0
+git tag v1.0.0
 git push origin master --tags
 ```
 
 GitHub Actions builds `.dmg` for Apple Silicon and Intel, then auto-publishes to Releases. See [CHANGELOG.md](CHANGELOG.md) for version history.
+
+---
 
 ## License
 
