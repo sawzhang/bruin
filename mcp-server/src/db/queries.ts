@@ -384,13 +384,22 @@ export function updateNote(
   id: string,
   title?: string,
   content?: string,
-  tags?: string[]
+  tags?: string[],
+  expectedUpdatedAt?: string  // Optimistic lock: if provided, rejects stale writes
 ): NoteWithTags | null {
   const existing = db.prepare("SELECT * FROM notes WHERE id = ?").get(id) as
     | NoteRow
     | undefined;
 
   if (!existing) return null;
+
+  // Optimistic concurrency: reject if another writer already updated this note
+  if (expectedUpdatedAt && existing.updated_at !== expectedUpdatedAt) {
+    throw new Error(
+      `Conflict: note '${id}' was updated at ${existing.updated_at} (you expected ${expectedUpdatedAt}). ` +
+      `Re-read the note and retry with the current updated_at.`
+    );
+  }
 
   const newTitle = title ?? existing.title;
   const newContent = content ?? existing.content;

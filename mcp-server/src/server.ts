@@ -227,18 +227,23 @@ export function createServer(): McpServer {
 
   server.tool(
     "update_note",
-    "Update an existing note",
+    "Update an existing note. Pass expected_updated_at (from the note you read) to enable optimistic locking and prevent concurrent overwrites.",
     {
       note_id: z.string().describe("The UUID of the note to update"),
       title: z.string().optional().describe("New title"),
       content: z.string().optional().describe("New markdown content"),
       tags: z.array(z.string()).optional().describe("New tags. If omitted and content is updated, tags are re-extracted from content."),
+      expected_updated_at: z.string().optional().describe("ISO timestamp from the note you last read. If set and the note was updated by another writer since then, the update is rejected with a conflict error. Recommended for safe concurrent access."),
     },
     async (args) => {
-      const note = updateNote(args.note_id, args.title, args.content, args.tags);
-      if (!note) return error(`Note '${args.note_id}' not found`);
-      notifyNoteChanged(args.note_id);
-      return text(note);
+      try {
+        const note = updateNote(args.note_id, args.title, args.content, args.tags, args.expected_updated_at);
+        if (!note) return error(`Note '${args.note_id}' not found`);
+        notifyNoteChanged(args.note_id);
+        return text(note);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
     }
   );
 
