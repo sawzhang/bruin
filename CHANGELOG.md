@@ -5,6 +5,11 @@ All notable changes to Bruin will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-03-26
+
+### Changed
+- Version bump to 1.1.2
+
 ## [1.1.0] - 2026-03-26
 
 ### Added
