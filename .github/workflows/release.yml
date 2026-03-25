@@ -67,4 +67,7 @@ jobs:
             > **Note**: If macOS shows "app is damaged", run: `xattr -cr /Applications/Bruin.app`
           releaseDraft: false
           prerelease: false
-          args: --target ${{ matrix.target }}
+          # entitlements-direct.plist omits app-sandbox so CLI flags (--mcp-proxy,
+          # --write-config, --install-skill) can write to ~/.claude.json and
+          # ~/.claude/skills/. The Mac App Store build uses the sandboxed entitlements.plist.
+          args: --target ${{ matrix.target }} --config '{"bundle":{"macOS":{"entitlements":"entitlements-direct.plist"}}}'
