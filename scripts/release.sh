@@ -65,19 +65,22 @@ sed -i '' "s/^version = \"${CURRENT}\"/version = \"${NEW}\"/" src-tauri/Cargo.to
 # ── prepend changelog entry ───────────────────────────────────────────────────
 
 DATE=$(date +%Y-%m-%d)
-CHANGELOG_ENTRY="## [${NEW}] - ${DATE}
 
-### Changed
-- Version bump to ${NEW}
+# Insert new entry before the first ## section (macOS-safe, no awk multiline)
+python3 - <<PYEOF
+import re, sys
 
-"
+entry = "## [${NEW}] - ${DATE}\n\n### Changed\n- Version bump to ${NEW}\n\n"
 
-# Insert after the first line (# Changelog header)
-awk -v entry="$CHANGELOG_ENTRY" '
-  NR == 1 { print; next }
-  /^## \[/ && !inserted { printf "%s", entry; inserted = 1 }
-  { print }
-' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+with open("CHANGELOG.md", "r") as f:
+    content = f.read()
+
+# Insert before the first '## [' heading
+content = re.sub(r'(^## \[)', entry + r'\1', content, count=1, flags=re.MULTILINE)
+
+with open("CHANGELOG.md", "w") as f:
+    f.write(content)
+PYEOF
 
 echo "→ Updated CHANGELOG.md, package.json, Cargo.toml, tauri.conf.json"
 
