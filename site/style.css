@@ -288,6 +288,17 @@ h1, h2, h3, h4, h5 {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  position: relative;
+}
+.hero-oneliner-box:hover {
+  border-color: var(--accent);
+  background: var(--bg-elevated);
+}
+.hero-oneliner-box.copied {
+  border-color: #22c55e;
+  background: var(--bg-elevated);
 }
 .hero-oneliner-box code {
   flex: 1;
@@ -300,24 +311,23 @@ h1, h2, h3, h4, h5 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: none;
+  user-select: none;
 }
-.hero-copy-btn {
+.hero-copy-indicator {
   flex-shrink: 0;
-  background: transparent;
-  color: var(--text-muted);
-  border: none;
-  border-left: 1px solid var(--border);
-  padding: .9rem 1rem;
-  font-size: .75rem;
-  font-family: var(--font);
-  font-weight: 500;
-  cursor: pointer;
-  transition: color .15s, background .15s;
-  white-space: nowrap;
+  width: 36px;
+  height: 36px;
+  margin-right: .5rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='9' y='9' width='13' height='13' rx='2'/%3E%3Cpath d='M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px;
+  transition: background-image .15s;
+  pointer-events: none;
 }
-.hero-copy-btn:hover {
-  color: var(--text);
-  background: var(--bg-elevated);
+.hero-oneliner-box.copied .hero-copy-indicator {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2322c55e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E");
 }
 .hero-oneliner-hint {
   font-size: .75rem;
@@ -1441,10 +1451,6 @@ h1, h2, h3, h4, h5 {
 }
 
 @media (max-width: 600px) {
-  .hero-oneliner-box {
-    flex-direction: column;
-    align-items: stretch;
-  }
   .hero-oneliner-box code {
     white-space: normal;
     overflow: visible;
@@ -1452,13 +1458,6 @@ h1, h2, h3, h4, h5 {
     overflow-wrap: break-word;
     word-break: break-word;
     font-size: .82rem;
-    padding: .85rem 1rem .5rem;
-  }
-  .hero-copy-btn {
-    border-left: none;
-    border-top: 1px solid var(--border);
-    text-align: right;
-    padding: .5rem 1rem .75rem;
   }
 
   .claude-caps {
