@@ -266,10 +266,66 @@ h1, h2, h3, h4, h5 {
   line-height: 1.7;
 }
 
+/* Hero one-liner CTA */
+.hero-oneliner {
+  max-width: 600px;
+  margin: 2.5rem auto 0;
+  text-align: left;
+}
+.hero-oneliner-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: .9;
+  margin-bottom: .6rem;
+}
+.hero-oneliner-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(214, 48, 49, 0.07);
+  border: 1.5px solid rgba(214, 48, 49, 0.35);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+}
+.hero-oneliner-box code {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: .95rem;
+  color: var(--text);
+  line-height: 1.5;
+  word-break: break-all;
+}
+.hero-copy-btn {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: .38rem .85rem;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.hero-copy-btn:hover { opacity: .85; }
+.hero-oneliner-hint {
+  font-size: .78rem;
+  color: var(--text-secondary);
+  margin-top: .6rem;
+  text-align: center;
+}
+
 .hero-actions {
   display: flex;
   gap: 16px;
   justify-content: center;
+  margin-top: 2rem;
   margin-bottom: 80px;
 }
 
