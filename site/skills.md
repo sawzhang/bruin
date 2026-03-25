@@ -21,30 +21,27 @@
 
 ### Step 2 — Check & Configure MCP Server
 
-**Check:** Read `~/.claude.json` — does it contain a `"bruin"` key under `mcpServers`?
+**Check:** Read `~/.claude.json` — does it contain a `"bruin-notes"` key under `mcpServers`?
 - ✓ exists → skip to Step 3
-- ✗ missing → clone the repo and add config:
+- ✗ missing → run this one command (MCP server is built into the app — no npm needed):
 
 ```bash
-git clone https://github.com/sawzhang/bruin.git ~/bruin
-cd ~/bruin/mcp-server && npm install && npm run build
+/Applications/Bruin.app/Contents/MacOS/bruin --write-config
 ```
 
-Then add this to `~/.claude.json`:
+This auto-merges the correct config into `~/.claude.json`. The config will look like:
 
 ```json
 {
   "mcpServers": {
-    "bruin": {
-      "command": "node",
-      "args": ["REPLACE_WITH_ABSOLUTE_PATH/bruin/mcp-server/dist/index.js"],
+    "bruin-notes": {
+      "command": "/Applications/Bruin.app/Contents/MacOS/bruin",
+      "args": ["--mcp"],
       "env": { "BRUIN_AGENT_NAME": "claude-code" }
     }
   }
 }
 ```
-
-Replace `REPLACE_WITH_ABSOLUTE_PATH` with the actual absolute path where you cloned (e.g. `/Users/yourname`).
 
 `BRUIN_AGENT_NAME` auto-creates your agent identity and persists it across sessions. Change the name to match your use case (e.g. `"research-assistant"`, `"daily-reporter"`).
 
@@ -54,10 +51,10 @@ Replace `REPLACE_WITH_ABSOLUTE_PATH` with the actual absolute path where you clo
 
 **Check:** `ls ~/.claude/skills/bruin.md`
 - ✓ exists → skip to Step 4
-- ✗ missing → run (from the cloned repo):
+- ✗ missing → run:
 
 ```bash
-node ~/bruin/mcp-server/dist/index.js --install-skill
+/Applications/Bruin.app/Contents/MacOS/bruin --install-skill
 ```
 
 This copies a skill file to `~/.claude/skills/bruin.md`. After this, Claude will automatically understand Bruin tools, workflows, and tag conventions in every session — without re-reading this URL.
@@ -66,11 +63,13 @@ This copies a skill file to `~/.claude/skills/bruin.md`. After this, Claude will
 
 ### Step 4 — Verify & Report
 
-Run this to confirm the MCP server is reachable:
+Verify the MCP server starts correctly:
 
 ```bash
-npx bruin-mcp-server --test-connection
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | /Applications/Bruin.app/Contents/MacOS/bruin --mcp
 ```
+
+Expected: a JSON response with `"serverInfo": {"name": "bruin-notes"}`.
 
 Then report back to the user:
 ```
@@ -78,8 +77,8 @@ Bruin install complete:
 ✓/✗ App installed at /Applications/Bruin.app
 ✓/✗ MCP config added to ~/.claude.json
 ✓/✗ Skill file at ~/.claude/skills/bruin.md
-✓/✗ MCP server connection test
-Next: restart Claude Code to activate the bruin MCP server.
+✓/✗ MCP server responded to initialize
+Next: restart Claude Code to activate the bruin-notes MCP server.
 ```
 
 ---
@@ -92,7 +91,8 @@ You / Agent ──MCP (stdio)──► Bruin MCP Server ──► SQLite ◄─�
                                                  iCloud Sync
 ```
 
-- **Database**: `~/Library/Application Support/com.bruin.app/bruin.db` (shared, WAL mode)
+- **MCP server**: built into `Bruin.app` — no separate install, no npm, no Node.js
+- **Database**: `~/Library/Application Support/com.bruin.notes/bruin.db` (shared, WAL mode)
 - **Notes**: stored as markdown with YAML frontmatter, synced to iCloud
 - **Agent writes draft → Human reviews in app → Human publishes**
 
@@ -126,7 +126,7 @@ In Claude Code, use `@bruin` to reference:
 
 ---
 
-## MCP Tools — Complete Reference (60 Tools)
+## MCP Tools — Complete Reference
 
 ### Notes & Search (16 tools)
 

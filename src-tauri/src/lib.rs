@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod markdown;
+mod mcp;
 mod sync;
 
 use commands::sync::SyncState;
@@ -126,4 +127,16 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+pub fn run_mcp() {
+    mcp::run();
+}
+
+pub fn install_skill() {
+    mcp::install_skill();
+}
+
+pub fn write_mcp_config() {
+    mcp::write_mcp_config();
 }
