@@ -2,39 +2,29 @@
 
 > Bruin is a local-first macOS markdown note app where AI agents read, write, and organize knowledge through MCP — and humans review the results.
 
-**You are reading this file because you want to install or use Bruin.** Follow the steps below.
+**You are reading this file because the user wants to install Bruin. Execute the protocol below top-to-bottom. Each step has a check condition — verify it before moving on. Report back with ✓/✗ status for each step.**
 
 ---
 
-## Step 1 — Install the macOS App
+## Install Protocol
 
-Download from **https://github.com/sawzhang/bruin/releases/latest** (free, Apple Silicon + Intel).
+### Step 1 — Check & Install the macOS App
 
-If macOS shows "damaged", run: `xattr -cr /Applications/Bruin.app`
+**Check:** `ls /Applications/Bruin.app`
+- ✓ exists → skip to Step 2
+- ✗ missing → direct user to install:
+  - **Mac App Store (recommended):** https://apps.apple.com/app/bruin-notes/id6759669768
+  - **Direct download:** https://github.com/sawzhang/bruin/releases/latest (free, Apple Silicon + Intel)
+  - If macOS shows "damaged" after direct download: run `xattr -cr /Applications/Bruin.app`
 
 ---
 
-## Step 2 — Add MCP Server to Your Agent Config
+### Step 2 — Check & Configure MCP Server
 
-Add this to your MCP client config (Claude Code, Claude Desktop, Cursor, etc.):
+**Check:** Read `~/.claude.json` — does it contain a `"bruin"` key under `mcpServers`?
+- ✓ exists → skip to Step 3
+- ✗ missing → add this block to `~/.claude.json`:
 
-```json
-{
-  "mcpServers": {
-    "bruin": {
-      "command": "npx",
-      "args": ["bruin-mcp-server"],
-      "env": {
-        "BRUIN_AGENT_NAME": "claude-code"
-      }
-    }
-  }
-}
-```
-
-`BRUIN_AGENT_NAME` auto-creates your agent identity and persists it across sessions. All note writes are attributed to this agent. Change the name to match your use case (e.g. `"research-assistant"`, `"daily-reporter"`).
-
-**For Claude Code specifically**, add to `~/.claude.json`:
 ```json
 {
   "mcpServers": {
@@ -47,7 +37,11 @@ Add this to your MCP client config (Claude Code, Claude Desktop, Cursor, etc.):
 }
 ```
 
-**From a local clone** (if you cloned the repo):
+`BRUIN_AGENT_NAME` auto-creates your agent identity and persists it across sessions. Change the name to match your use case (e.g. `"research-assistant"`, `"daily-reporter"`).
+
+**Other clients** (Claude Desktop, Cursor, etc.) use the same JSON block in their respective config files.
+
+**From a local clone:**
 ```json
 {
   "mcpServers": {
@@ -62,15 +56,37 @@ Add this to your MCP client config (Claude Code, Claude Desktop, Cursor, etc.):
 
 ---
 
-## Step 3 — Install the Claude Code Skill (Recommended)
+### Step 3 — Install the Claude Code Skill
 
-This makes Claude natively understand Bruin across all sessions without re-reading this file:
+**Check:** `ls ~/.claude/skills/bruin.md`
+- ✓ exists → skip to Step 4
+- ✗ missing → run:
 
 ```bash
 npx bruin-mcp-server --install-skill
 ```
 
-This copies a skill file to `~/.claude/skills/bruin.md`. After this, Claude will automatically understand Bruin tools, workflows, and tag conventions in every session.
+This copies a skill file to `~/.claude/skills/bruin.md`. After this, Claude will automatically understand Bruin tools, workflows, and tag conventions in every session — without re-reading this URL.
+
+---
+
+### Step 4 — Verify & Report
+
+Run this to confirm the MCP server is reachable:
+
+```bash
+npx bruin-mcp-server --test-connection
+```
+
+Then report back to the user:
+```
+Bruin install complete:
+✓/✗ App installed at /Applications/Bruin.app
+✓/✗ MCP config added to ~/.claude.json
+✓/✗ Skill file at ~/.claude/skills/bruin.md
+✓/✗ MCP server connection test
+Next: restart Claude Code to activate the bruin MCP server.
+```
 
 ---
 
@@ -325,4 +341,4 @@ Tags are auto-extracted from `#hashtag` patterns in note content. Or pass explic
 
 ---
 
-*Source: https://github.com/sawzhang/bruin — MIT License*
+*Source: https://github.com/sawzhang/bruin — MIT License — Available on the Mac App Store*
