@@ -21,7 +21,7 @@ test.describe('Editor Undo / Redo', () => {
     await app.page.keyboard.type('hello');
     await expect(editor).toContainText('hello');
 
-    await app.page.keyboard.press('Meta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
 
     // After undo the last insertion is removed
     await expect(editor).not.toContainText('hello');
@@ -34,11 +34,11 @@ test.describe('Editor Undo / Redo', () => {
     await expect(editor).toContainText('world');
 
     // Undo
-    await app.page.keyboard.press('Meta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
     await expect(editor).not.toContainText('world');
 
     // Redo
-    await app.page.keyboard.press('Meta+Shift+z');
+    await app.page.keyboard.press('ControlOrMeta+Shift+z');
     await expect(editor).toContainText('world');
   });
 
@@ -46,7 +46,7 @@ test.describe('Editor Undo / Redo', () => {
     const editor = await openNoteEditor(app);
 
     // Editor starts empty; undo should be a no-op
-    await app.page.keyboard.press('Meta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
 
     // Editor still visible and editable
     await expect(editor).toBeVisible();
@@ -64,9 +64,9 @@ test.describe('Editor Undo / Redo', () => {
     await expect(editor).toContainText('gamma');
 
     // Undo several times
-    await app.page.keyboard.press('Meta+z');
-    await app.page.keyboard.press('Meta+z');
-    await app.page.keyboard.press('Meta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
 
     // At least the most recently typed chunk should be gone
     await expect(editor).not.toContainText('gamma');
@@ -79,11 +79,11 @@ test.describe('Editor Undo / Redo', () => {
     await expect(editor).toContainText('restore me');
 
     // Undo
-    await app.page.keyboard.press('Meta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
     await expect(editor).not.toContainText('restore me');
 
     // Redo
-    await app.page.keyboard.press('Meta+Shift+z');
+    await app.page.keyboard.press('ControlOrMeta+Shift+z');
     await expect(editor).toContainText('restore me');
   });
 
@@ -91,7 +91,7 @@ test.describe('Editor Undo / Redo', () => {
     const editor = await openNoteEditor(app);
 
     await app.page.keyboard.type('first');
-    await app.page.keyboard.press('Meta+z');
+    await app.page.keyboard.press('ControlOrMeta+z');
     await expect(editor).not.toContainText('first');
 
     // Type new content after undo
@@ -99,7 +99,7 @@ test.describe('Editor Undo / Redo', () => {
     await expect(editor).toContainText('second');
 
     // Redo should not bring back "first"
-    await app.page.keyboard.press('Meta+Shift+z');
+    await app.page.keyboard.press('ControlOrMeta+Shift+z');
     await expect(editor).not.toContainText('first');
     await expect(editor).toContainText('second');
   });
