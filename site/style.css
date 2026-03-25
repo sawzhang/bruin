@@ -1160,6 +1160,124 @@ h1, h2, h3, h4, h5 {
   color: var(--text-muted);
 }
 
+/* ======================== CLAUDE CODE SECTION ======================== */
+.claude-section {
+  padding: 100px 0;
+  border-top: 1px solid var(--border);
+}
+.claude-title {
+  font-size: 42px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  text-align: center;
+  margin: .5rem 0 .75rem;
+}
+.claude-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 1.05rem;
+  margin-bottom: 3.5rem;
+}
+
+/* Numbered setup steps */
+.setup-steps {
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+.setup-step {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+}
+.step-num {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: .82rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.step-body {
+  flex: 1;
+  min-width: 0;
+}
+.step-title {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: .65rem;
+}
+.step-note {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: .82rem;
+}
+
+/* Capability grid */
+.claude-caps {
+  max-width: 680px;
+  margin: 3.5rem auto 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.claude-cap {
+  display: flex;
+  gap: .9rem;
+  align-items: flex-start;
+  padding: 1.25rem 1.4rem;
+  background: var(--bg-raised);
+  transition: background .15s;
+}
+.claude-cap:hover { background: var(--bg-elevated); }
+.claude-cap-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.claude-cap-title {
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: .25rem;
+}
+.claude-cap-desc {
+  font-size: .78rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.claude-cap-desc code {
+  font-size: .75rem;
+  background: var(--surface);
+  padding: .1em .4em;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+.claude-footer {
+  text-align: center;
+  margin-top: 2.5rem;
+}
+
 /* ======================== DOWNLOAD ======================== */
 .download {
   padding: 120px 0;
@@ -1319,6 +1437,17 @@ h1, h2, h3, h4, h5 {
 }
 
 @media (max-width: 600px) {
+  .claude-caps {
+    grid-template-columns: 1fr;
+  }
+  .claude-title {
+    font-size: 28px;
+  }
+  .setup-step {
+    flex-direction: column;
+    gap: .75rem;
+  }
+
   .hero-title {
     font-size: 28px;
   }
