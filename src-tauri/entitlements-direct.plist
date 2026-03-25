@@ -2,15 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- No app-sandbox: required for CLI flags (--mcp-proxy, --write-config, --install-skill)
-         to access ~/.claude.json and ~/.claude/skills/ outside the app container.
-         The Mac App Store build uses entitlements.plist which has app-sandbox enabled. -->
-
-    <!-- Network access for webhook HTTP calls -->
     <key>com.apple.security.network.client</key>
     <true/>
-
-    <!-- File access for import/export via file dialog -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
 </dict>
