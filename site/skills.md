@@ -36,7 +36,7 @@ This auto-merges the correct config into `~/.claude.json`. The config will look 
   "mcpServers": {
     "bruin-notes": {
       "command": "/Applications/Bruin.app/Contents/MacOS/bruin",
-      "args": ["--mcp"],
+      "args": ["--mcp-proxy"],
       "env": { "BRUIN_AGENT_NAME": "claude-code" }
     }
   }
@@ -66,7 +66,7 @@ This copies a skill file to `~/.claude/skills/bruin.md`. After this, Claude will
 Verify the MCP server starts correctly:
 
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | /Applications/Bruin.app/Contents/MacOS/bruin --mcp
+echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}' | /Applications/Bruin.app/Contents/MacOS/bruin --mcp-proxy
 ```
 
 Expected: a JSON response with `"serverInfo": {"name": "bruin-notes"}`.
@@ -328,7 +328,7 @@ Tags are auto-extracted from `#hashtag` patterns in note content. Or pass explic
 | Issue | Fix |
 |-------|-----|
 | `app is damaged` | `xattr -cr /Applications/Bruin.app` |
-| MCP server not found | `npm install -g bruin-mcp-server` or use `npx` |
+| MCP server not found | Make sure Bruin.app is running first (`--mcp-proxy` connects to the running app) |
 | Semantic search returns nothing | Run `reindex_embeddings()` to index existing notes |
 | Notes not showing in app | App and MCP server share the same SQLite file — check that Bruin app is running |
 | Agent ID resets on restart | Set `BRUIN_AGENT_NAME` env var in MCP config |
