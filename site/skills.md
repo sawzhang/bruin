@@ -23,36 +23,30 @@
 
 **Check:** Read `~/.claude.json` — does it contain a `"bruin"` key under `mcpServers`?
 - ✓ exists → skip to Step 3
-- ✗ missing → add this block to `~/.claude.json`:
+- ✗ missing → clone the repo and add config:
 
-```json
-{
-  "mcpServers": {
-    "bruin": {
-      "command": "npx",
-      "args": ["bruin-mcp-server"],
-      "env": { "BRUIN_AGENT_NAME": "claude-code" }
-    }
-  }
-}
+```bash
+git clone https://github.com/sawzhang/bruin.git ~/bruin
+cd ~/bruin/mcp-server && npm install && npm run build
 ```
 
-`BRUIN_AGENT_NAME` auto-creates your agent identity and persists it across sessions. Change the name to match your use case (e.g. `"research-assistant"`, `"daily-reporter"`).
+Then add this to `~/.claude.json`:
 
-**Other clients** (Claude Desktop, Cursor, etc.) use the same JSON block in their respective config files.
-
-**From a local clone:**
 ```json
 {
   "mcpServers": {
     "bruin": {
       "command": "node",
-      "args": ["/path/to/bruin/mcp-server/dist/index.js"],
+      "args": ["REPLACE_WITH_ABSOLUTE_PATH/bruin/mcp-server/dist/index.js"],
       "env": { "BRUIN_AGENT_NAME": "claude-code" }
     }
   }
 }
 ```
+
+Replace `REPLACE_WITH_ABSOLUTE_PATH` with the actual absolute path where you cloned (e.g. `/Users/yourname`).
+
+`BRUIN_AGENT_NAME` auto-creates your agent identity and persists it across sessions. Change the name to match your use case (e.g. `"research-assistant"`, `"daily-reporter"`).
 
 ---
 
@@ -60,10 +54,10 @@
 
 **Check:** `ls ~/.claude/skills/bruin.md`
 - ✓ exists → skip to Step 4
-- ✗ missing → run:
+- ✗ missing → run (from the cloned repo):
 
 ```bash
-npx bruin-mcp-server --install-skill
+node ~/bruin/mcp-server/dist/index.js --install-skill
 ```
 
 This copies a skill file to `~/.claude/skills/bruin.md`. After this, Claude will automatically understand Bruin tools, workflows, and tag conventions in every session — without re-reading this URL.
