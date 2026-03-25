@@ -1449,7 +1449,8 @@ h1, h2, h3, h4, h5 {
     white-space: normal;
     overflow: visible;
     text-overflow: unset;
-    word-break: break-all;
+    overflow-wrap: break-word;
+    word-break: break-word;
     font-size: .82rem;
     padding: .85rem 1rem .5rem;
   }
