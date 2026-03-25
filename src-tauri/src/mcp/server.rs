@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 // ── DB path discovery ────────────────────────────────────────────────────────
 
-fn find_db() -> PathBuf {
+pub(crate) fn find_db() -> PathBuf {
     if let Ok(p) = std::env::var("BRUIN_DB") {
         let path = PathBuf::from(p);
         if path.exists() {
@@ -39,7 +39,7 @@ fn find_db() -> PathBuf {
 
 // ── Agent auto-setup ─────────────────────────────────────────────────────────
 
-fn setup_agent(conn: &Connection) -> Option<String> {
+pub(crate) fn setup_agent(conn: &Connection) -> Option<String> {
     // Prefer explicit UUID
     if let Ok(id) = std::env::var("BRUIN_AGENT_ID") {
         let exists: bool = conn
@@ -1703,7 +1703,7 @@ fn tools_list() -> Value {
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
-fn dispatch(
+pub(crate) fn dispatch(
     conn: &Connection,
     method: &str,
     params: &Value,
@@ -1946,7 +1946,7 @@ pub fn write_mcp_config() {
         "mcpServers": {
             "bruin-notes": {
                 "command": exe_str,
-                "args": ["--mcp"],
+                "args": ["--mcp-proxy"],
                 "env": {
                     "BRUIN_AGENT_NAME": "claude-code"
                 }
@@ -1975,7 +1975,7 @@ pub fn write_mcp_config() {
     }
     existing["mcpServers"]["bruin-notes"] = json!({
         "command": exe_str,
-        "args": ["--mcp"],
+        "args": ["--mcp-proxy"],
         "env": { "BRUIN_AGENT_NAME": "claude-code" }
     });
 
@@ -1983,4 +1983,78 @@ pub fn write_mcp_config() {
         Ok(_) => println!("\n✓ Auto-merged into {}", config_path.display()),
         Err(e) => eprintln!("\n✗ Could not auto-merge ({}). Please add manually.", e),
     }
+}
+
+// ── Socket path helper ────────────────────────────────────────────────────────
+
+pub(crate) fn get_default_socket_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_default();
+    PathBuf::from(home)
+        .join("Library")
+        .join("Application Support")
+        .join("com.bruin.notes")
+        .join("mcp.sock")
+}
+
+// ── MCP proxy: bridges Claude Code stdio ↔ the running app's Unix socket ─────
+
+pub fn run_mcp_proxy() {
+    use std::io::BufRead;
+    use std::os::unix::net::UnixStream;
+
+    let socket_path = get_default_socket_path();
+    let stream = match UnixStream::connect(&socket_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "[bruin-mcp-proxy] Bruin.app is not running or MCP socket not found.\n\
+                 Start Bruin.app first, then retry.\n\
+                 Socket: {}\n\
+                 Error: {}",
+                socket_path.display(),
+                e
+            );
+            std::process::exit(1);
+        }
+    };
+
+    // stdin → socket
+    let stream_write = stream.try_clone().expect("clone unix stream");
+    let t_write = std::thread::spawn(move || {
+        let stdin = std::io::stdin();
+        let mut writer = stream_write;
+        for line in stdin.lock().lines() {
+            match line {
+                Ok(l) => {
+                    use std::io::Write;
+                    if writeln!(writer, "{}", l).is_err() {
+                        break;
+                    }
+                    let _ = writer.flush();
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    // socket → stdout
+    let t_read = std::thread::spawn(move || {
+        use std::io::{BufReader, Write};
+        let stdout = std::io::stdout();
+        let mut out = stdout.lock();
+        for line in BufReader::new(stream).lines() {
+            match line {
+                Ok(l) => {
+                    if writeln!(out, "{}", l).is_err() {
+                        break;
+                    }
+                    let _ = out.flush();
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let _ = t_write.join();
+    let _ = t_read.join();
 }

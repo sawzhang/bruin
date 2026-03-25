@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod mcp;
 pub mod agents;
 pub mod export;
 pub mod files;

@@ -5,6 +5,7 @@ mod mcp;
 mod sync;
 
 use commands::sync::SyncState;
+use mcp::McpStatus;
 use sync::watcher::WatcherState;
 use db::migrations;
 use std::sync::Mutex;
@@ -18,9 +19,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Mutex::new(SyncState::default()))
         .manage(Mutex::new(WatcherState::new()))
+        .manage(Mutex::new(McpStatus::default()))
         .setup(|app| {
             let app_handle = app.handle().clone();
             migrations::run_migrations(&app_handle)?;
+
+            // Start the internal MCP socket server
+            mcp::start_socket_server(app_handle.clone());
 
             // Run initial full reconciliation only if iCloud is available
             if sync::icloud::is_icloud_available() {
@@ -124,6 +129,8 @@ pub fn run() {
             commands::workflows::get_workflow_template,
             commands::workflows::create_workflow_template,
             commands::workflows::delete_workflow_template,
+            // MCP status
+            commands::mcp::get_mcp_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
@@ -131,6 +138,10 @@ pub fn run() {
 
 pub fn run_mcp() {
     mcp::run();
+}
+
+pub fn run_mcp_proxy() {
+    mcp::run_mcp_proxy();
 }
 
 pub fn install_skill() {

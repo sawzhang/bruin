@@ -37,14 +37,21 @@ export function Sidebar() {
   useEffect(() => {
     getSyncStatus().then(setSyncStatus).catch(() => {});
 
-    const unlistenPromise = listen("sync-status-changed", () => {
+    const unlistenSync = listen("sync-status-changed", () => {
       getSyncStatus().then(setSyncStatus).catch(() => {});
     });
 
+    // MCP server writes directly to SQLite and fires this event via the
+    // trigger-file watcher — refresh the note list so the UI stays in sync.
+    const unlistenNotes = listen("notes-changed", () => {
+      loadNotes();
+    });
+
     return () => {
-      unlistenPromise.then((fn) => fn());
+      unlistenSync.then((fn) => fn());
+      unlistenNotes.then((fn) => fn());
     };
-  }, []);
+  }, [loadNotes]);
 
   const handleAllNotes = () => {
     clearTags();

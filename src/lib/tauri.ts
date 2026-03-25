@@ -18,6 +18,7 @@ import type { Agent } from "../types/agent";
 import type { Task, TaskStatus, TaskPriority } from "../types/task";
 import type { WorkflowTemplate, WorkflowStep } from "../types/workflow";
 import type { Webhook, WebhookLog } from "../types/webhook";
+import type { McpStatus } from "../types/mcp";
 
 // Note commands
 export async function createNote(params: CreateNoteParams): Promise<Note> {
@@ -415,4 +416,9 @@ export async function saveImage(
   filename: string,
 ): Promise<string> {
   return invoke("save_image", { data, filename });
+}
+
+// MCP status
+export async function getMcpStatus(): Promise<McpStatus> {
+  return invoke("get_mcp_status");
 }

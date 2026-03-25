@@ -5,6 +5,18 @@ All notable changes to Bruin will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-26
+
+### Added
+- **Embedded MCP socket server**: Bruin.app now starts an internal MCP server on a Unix domain socket (`~/Library/Application Support/com.bruin.notes/mcp.sock`) at launch — no external process management needed
+- **`--mcp-proxy` flag**: lightweight stdio↔socket bridge so Claude Code connects to the running app rather than spawning a standalone process
+- **MCP status in Settings**: live indicator showing whether the MCP server is running and how many clients are currently connected
+- Legacy `--mcp` standalone mode preserved for offline/headless use
+
+### Changed
+- `--write-config` now writes `--mcp-proxy` in the MCP config (connects to running app)
+- App can now sense and display active MCP client connections in real time
+
 ## [0.4.0] - 2026-02-25
 
 ### Added

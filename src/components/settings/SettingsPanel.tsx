@@ -1,7 +1,11 @@
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { useUIStore } from "../../stores/uiStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useWorkspaceStore } from "../../stores/workspaceStore";
 import { AgentListPanel } from "../agents/AgentListPanel";
+import { getMcpStatus } from "../../lib/tauri";
+import type { McpStatus } from "../../types/mcp";
 
 const FONT_OPTIONS = [
   { label: "System Default", value: "system-ui" },
@@ -146,6 +150,9 @@ export function SettingsPanel() {
             </button>
           </section>
 
+          {/* MCP Server */}
+          <McpSection />
+
           {/* Defaults */}
           <section>
             <h3 className="text-[12px] uppercase tracking-wider text-bear-text-muted font-medium mb-3">
@@ -169,6 +176,56 @@ export function SettingsPanel() {
         </div>
       </div>
     </div>
+  );
+}
+
+function McpSection() {
+  const [status, setStatus] = useState<McpStatus | null>(null);
+
+  useEffect(() => {
+    getMcpStatus().then(setStatus).catch(() => {});
+    const unlisten = listen("mcp-status-changed", () => {
+      getMcpStatus().then(setStatus).catch(() => {});
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  const running = status?.is_running ?? false;
+  const clients = status?.client_count ?? 0;
+
+  return (
+    <section>
+      <h3 className="text-[12px] uppercase tracking-wider text-bear-text-muted font-medium mb-3">
+        MCP Server
+      </h3>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-bear-text">Status</span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`w-2 h-2 rounded-full ${running ? "bg-green-500" : "bg-bear-text-muted"}`}
+            />
+            <span className="text-[13px] text-bear-text-secondary">
+              {running ? "Running" : "Stopped"}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-[13px] text-bear-text">Clients connected</span>
+          <span className="text-[13px] text-bear-text-secondary">{clients}</span>
+        </div>
+        {status?.socket_path && (
+          <div className="flex flex-col gap-0.5 mt-1">
+            <span className="text-[11px] text-bear-text-muted font-medium uppercase tracking-wide">
+              Socket
+            </span>
+            <span className="text-[11px] text-bear-text-muted font-mono break-all">
+              {status.socket_path}
+            </span>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 

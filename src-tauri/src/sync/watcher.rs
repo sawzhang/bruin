@@ -161,6 +161,9 @@ pub fn start_watcher(app_handle: &AppHandle) -> Result<WatcherState, Box<dyn std
                                                 if !result.imported_note_ids.is_empty() {
                                                     let _ = app.emit("notes-imported", &result.imported_note_ids);
                                                 }
+                                                // Always notify the frontend to refresh — MCP may have
+                                                // written directly to SQLite without touching iCloud files.
+                                                let _ = app.emit("notes-changed", ());
                                                 // Update SyncState so UI shows "Synced"
                                                 let sync_state = app.state::<Mutex<SyncState>>();
                                                 if let Ok(mut state) = sync_state.lock() {
