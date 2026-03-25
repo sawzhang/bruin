@@ -7,9 +7,9 @@
 [![CI](https://github.com/sawzhang/bruin/actions/workflows/ci.yml/badge.svg)](https://github.com/sawzhang/bruin/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Download for macOS](https://github.com/sawzhang/bruin/releases/latest)** · **[bruin.me](https://bruin.me)**
+**[Mac App Store](https://apps.apple.com/app/bruin-notes/id6759669768)** · **[Direct Download](https://github.com/sawzhang/bruin/releases/latest)** · **[bruin.me](https://bruin.me)**
 
-> If macOS shows "app is damaged": `xattr -cr /Applications/Bruin.app`
+> Direct download only: if macOS shows "app is damaged": `xattr -cr /Applications/Bruin.app`
 
 ---
 
@@ -25,24 +25,18 @@ Claude will read the skills file, walk you through adding the MCP config, and st
 
 **Or set up manually in 2 steps:**
 
-**1. Add to your MCP config** (`~/.claude.json` or Claude Desktop settings):
+**1. Add to your MCP config** (auto-writes the correct config):
 
-```json
-{
-  "mcpServers": {
-    "bruin": {
-      "command": "npx",
-      "args": ["bruin-mcp-server"],
-      "env": { "BRUIN_AGENT_NAME": "claude-code" }
-    }
-  }
-}
+```bash
+/Applications/Bruin.app/Contents/MacOS/bruin --write-config
 ```
+
+This writes to `~/.claude.json`. The MCP server is **built into the app** — no npm, no Node.js required.
 
 **2. Install the Claude Code skill** (makes Claude natively understand Bruin across all sessions):
 
 ```bash
-npx bruin-mcp-server --install-skill
+/Applications/Bruin.app/Contents/MacOS/bruin --install-skill
 ```
 
 That's it. Claude can now write notes, run daily logs, do research capture, build knowledge graphs, and more — all through natural conversation.
