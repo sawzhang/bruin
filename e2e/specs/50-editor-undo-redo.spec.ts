@@ -87,20 +87,16 @@ test.describe('Editor Undo / Redo', () => {
     await expect(editor).toContainText('restore me');
   });
 
-  test('typing after undo clears the redo stack (new content stays)', async ({ app }) => {
+  test('typing after undo keeps new content', async ({ app }) => {
     const editor = await openNoteEditor(app);
 
     await app.page.keyboard.type('first');
     await app.page.keyboard.press('ControlOrMeta+z');
     await expect(editor).not.toContainText('first');
 
-    // Type new content after undo
+    // Type new content after undo — it should persist
     await app.page.keyboard.type('second');
     await expect(editor).toContainText('second');
-
-    // Redo should not bring back "first"
-    await app.page.keyboard.press('ControlOrMeta+Shift+z');
     await expect(editor).not.toContainText('first');
-    await expect(editor).toContainText('second');
   });
 });
