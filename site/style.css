@@ -1441,6 +1441,25 @@ h1, h2, h3, h4, h5 {
 }
 
 @media (max-width: 600px) {
+  .hero-oneliner-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hero-oneliner-box code {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    word-break: break-all;
+    font-size: .82rem;
+    padding: .85rem 1rem .5rem;
+  }
+  .hero-copy-btn {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    text-align: right;
+    padding: .5rem 1rem .75rem;
+  }
+
   .claude-caps {
     grid-template-columns: 1fr;
   }
