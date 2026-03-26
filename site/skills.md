@@ -15,7 +15,7 @@
 - ✗ missing → direct user to install:
   - **Mac App Store (recommended):** https://apps.apple.com/app/bruin-notes/id6759669768
   - **Direct download:** https://github.com/sawzhang/bruin/releases/latest (free, Apple Silicon + Intel)
-  - If macOS shows "damaged" after direct download: run `xattr -cr /Applications/Bruin.app`
+  - If macOS shows "damaged" or CLI flags fail (exit 137): run `find /Applications/Bruin.app -exec xattr -c {} \; 2>/dev/null && codesign --force --sign - /Applications/Bruin.app/Contents/MacOS/bruin`
 
 ---
 
@@ -327,7 +327,7 @@ Tags are auto-extracted from `#hashtag` patterns in note content. Or pass explic
 
 | Issue | Fix |
 |-------|-----|
-| `app is damaged` | `xattr -cr /Applications/Bruin.app` |
+| `app is damaged` or CLI flags exit 137 | `find /Applications/Bruin.app -exec xattr -c {} \; 2>/dev/null && codesign --force --sign - /Applications/Bruin.app/Contents/MacOS/bruin` |
 | MCP server not found | Make sure Bruin.app is running first (`--mcp-proxy` connects to the running app) |
 | Semantic search returns nothing | Run `reindex_embeddings()` to index existing notes |
 | Notes not showing in app | App and MCP server share the same SQLite file — check that Bruin app is running |
