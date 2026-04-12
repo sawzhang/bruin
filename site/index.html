@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bruin - Agent-Native Markdown Notes</title>
-  <meta name="description" content="A beautiful markdown note-taking app built for AI agents and loved by humans. MCP-first design with 60 tools, knowledge graph, semantic search, and human-in-the-loop review." />
+  <meta name="description" content="A beautiful markdown note-taking app built for AI agents and loved by humans. MCP-first design with 66 native tools, wiki knowledge base, smart search, and human-in-the-loop review." />
   <meta name="keywords" content="markdown notes, MCP server, AI agent, knowledge graph, semantic search, local-first, Tauri, note-taking app, model context protocol, wiki-links, open source" />
   <link rel="canonical" href="https://sawzhang.github.io/bruin/" />
   <!-- Open Graph -->
@@ -23,14 +23,14 @@
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "Bruin",
-    "description": "Agent-native markdown note-taking app with MCP server, knowledge graph, and semantic search.",
+    "description": "Agent-native markdown note-taking app with native MCP server, wiki knowledge base, smart search, and knowledge graph.",
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "macOS",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "license": "https://opensource.org/licenses/MIT",
     "url": "https://sawzhang.github.io/bruin/",
     "downloadUrl": "https://github.com/sawzhang/bruin/releases/latest",
-    "softwareVersion": "1.0.0",
+    "softwareVersion": "1.2.0",
     "author": { "@type": "Person", "name": "Saw Zhang", "url": "https://github.com/sawzhang" }
   }
   </script>
@@ -177,7 +177,7 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4m0 14v4M4.22 4.22l2.83 2.83m9.9 9.9l2.83 2.83M1 12h4m14 0h4M4.22 19.78l2.83-2.83m9.9-9.9l2.83-2.83"/></svg>
           </div>
           <h3>Agent-Native</h3>
-          <p>Built from day one for AI agents. MCP server with 60 tools gives agents the same power as the GUI.</p>
+          <p>Built from day one for AI agents. Native MCP server with 66 tools gives agents the same power as the GUI. No Node.js needed.</p>
         </div>
         <div class="philosophy-card">
           <div class="philosophy-icon">
@@ -207,19 +207,19 @@
           <div class="feature-label">MCP-First</div>
           <h2>Built for agents,<br/>loved by humans</h2>
           <p>
-            Bruin ships with a full Model Context Protocol server.
+            Bruin ships with a native Rust MCP server built into the app binary &mdash; no Node.js, no npm, zero external dependencies.
             Claude, GPT, and any MCP-compatible agent can create notes,
-            search semantically, traverse the knowledge graph, manage agents,
+            build wiki knowledge bases, search smartly, traverse the knowledge graph, manage agents,
             tasks, workflows, and workspaces &mdash; no GUI required.
           </p>
           <div class="feature-highlights">
             <div class="feature-highlight">
-              <span class="feature-number">60</span>
+              <span class="feature-number">66</span>
               <span>MCP tools</span>
             </div>
             <div class="feature-highlight">
-              <span class="feature-number">6</span>
-              <span>Tool categories</span>
+              <span class="feature-number">7</span>
+              <span>Prompts</span>
             </div>
             <div class="feature-highlight">
               <span class="feature-number">0</span>
@@ -314,21 +314,67 @@
         </div>
       </div>
 
-      <!-- Feature 3: Semantic Search -->
+      <!-- Feature 3: Wiki Knowledge Base -->
       <div class="feature-row">
         <div class="feature-text">
-          <div class="feature-label">Semantic Search</div>
-          <h2>Search by meaning,<br/>not just keywords</h2>
+          <div class="feature-label">Wiki Knowledge Base</div>
+          <h2>Let AI build your<br/>second brain</h2>
           <p>
-            Powered by Hugging Face transformers, Bruin understands what you mean.
-            Combine vector similarity with full-text search, tag filters, date ranges,
-            and word count constraints in a single query.
+            Inspired by Karpathy's LLM Wiki pattern. Drop in articles, and AI agents
+            decompose them into cross-linked wiki pages, maintain an auto-generated index,
+            and run health checks to find orphan pages, missing links, and stale content.
           </p>
           <ul class="feature-list">
-            <li>Local embeddings &mdash; your data never leaves your machine</li>
+            <li>Ingest raw sources &rarr; AI creates 5&ndash;15 wiki pages per article</li>
+            <li>Auto-generated wiki index with link counts</li>
+            <li>Health check: orphans, missing pages, stale content</li>
+            <li>Source tracking with SHA-256 deduplication</li>
+          </ul>
+        </div>
+        <div class="feature-visual">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-dot red"></span>
+              <span class="code-dot yellow"></span>
+              <span class="code-dot green"></span>
+              <span class="code-title">wiki-ingest</span>
+            </div>
+            <pre><code><span class="code-comment">// Ingest an article into your wiki</span>
+<span class="code-keyword">const</span> src = <span class="code-keyword">await</span> mcp.<span class="code-fn">call</span>(<span class="code-string">"wiki_ingest_source"</span>, {
+  <span class="code-prop">title</span>: <span class="code-string">"Attention Is All You Need"</span>,
+  <span class="code-prop">content</span>: article_text,
+  <span class="code-prop">url</span>: <span class="code-string">"https://arxiv.org/abs/1706.03762"</span>
+});
+
+<span class="code-comment">// AI creates wiki pages, then link them</span>
+<span class="code-keyword">await</span> mcp.<span class="code-fn">call</span>(<span class="code-string">"wiki_link_source_pages"</span>, {
+  <span class="code-prop">source_id</span>: src.id,
+  <span class="code-prop">note_ids</span>: created_page_ids
+});
+
+<span class="code-comment">// Health check: find orphans &amp; gaps</span>
+<span class="code-keyword">const</span> report = <span class="code-keyword">await</span> mcp.<span class="code-fn">call</span>(<span class="code-string">"wiki_lint"</span>);
+<span class="code-comment">// → { orphans: 2, missing: 3, stale: 0 }</span></code></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- Feature 4: Smart Search -->
+      <div class="feature-row">
+        <div class="feature-text">
+          <div class="feature-label">Smart Search</div>
+          <h2>Search by meaning,<br/>not just keywords</h2>
+          <p>
+            Multi-level scoring ranks title matches highest, then tags, then content &mdash;
+            so the most relevant pages surface first. Combined with FTS5 full-text search,
+            tag filters, date ranges, and confidence levels (HIGH/MEDIUM/LOW).
+            No external models or APIs &mdash; runs entirely on your machine.
+          </p>
+          <ul class="feature-list">
+            <li>Multi-level scoring: title 10x &gt; tags 6x &gt; content</li>
             <li>SQLite FTS5 for instant full-text search</li>
-            <li>Advanced query with boolean tag filters</li>
-            <li>Combined semantic + keyword ranking</li>
+            <li>Coverage-based confidence levels</li>
+            <li>CJK and English tokenization built-in</li>
           </ul>
         </div>
         <div class="feature-visual">
@@ -336,31 +382,31 @@
             <div class="search-input">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="stroke:var(--icon-muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <span class="search-text">how do transformer attention mechanisms work</span>
-              <span class="search-badge">semantic</span>
+              <span class="search-badge">HIGH</span>
             </div>
             <div class="search-results">
               <div class="search-result">
                 <div class="search-result-title">Attention Is All You Need - Notes</div>
-                <div class="search-result-score">0.94</div>
+                <div class="search-result-score">42.0</div>
               </div>
               <div class="search-result">
                 <div class="search-result-title">Multi-Head Attention Deep Dive</div>
-                <div class="search-result-score">0.89</div>
+                <div class="search-result-score">36.5</div>
               </div>
               <div class="search-result">
                 <div class="search-result-title">Self-Attention vs Cross-Attention</div>
-                <div class="search-result-score">0.85</div>
+                <div class="search-result-score">28.0</div>
               </div>
               <div class="search-result faded">
                 <div class="search-result-title">Transformer Architecture Overview</div>
-                <div class="search-result-score">0.81</div>
+                <div class="search-result-score">18.5</div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Feature 4: State Machine -->
+      <!-- Feature 5: State Machine -->
       <div class="feature-row reverse">
         <div class="feature-text">
           <div class="feature-label">Review Workflow</div>

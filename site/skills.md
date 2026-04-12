@@ -110,6 +110,9 @@ These are structured workflows. In Claude Code: `/mcp:bruin-notes:<name>`
 | `research_capture` | `/mcp:bruin-notes:research_capture topic="Rust GUI frameworks"` | Create a structured research note from any source |
 | `weekly_review` | `/mcp:bruin-notes:weekly_review` | Query this week's notes and generate a review |
 | `link_knowledge` | `/mcp:bruin-notes:link_knowledge note_id="<id>"` | Find and create `[[wiki-links]]` between related notes |
+| `wiki_ingest` | `/mcp:bruin-notes:wiki_ingest title="Article" content="..."` | Ingest raw content into wiki — decompose into cross-linked pages |
+| `wiki_query` | `/mcp:bruin-notes:wiki_query question="How does X work?"` | Query the wiki knowledge base and synthesize an answer |
+| `wiki_lint_and_fix` | `/mcp:bruin-notes:wiki_lint_and_fix` | Health check: find orphans, missing pages, stale content — then fix |
 
 ---
 
@@ -138,7 +141,7 @@ In Claude Code, use `@bruin` to reference:
 | `delete_note` | note_id, permanent? | Trash (default) or permanent delete |
 | `list_notes` | tag?, limit?, offset? | Browse notes, optionally filtered by tag |
 | `search_notes` | query, limit? | Full-text search (FTS5) |
-| `semantic_search` | query, limit?, min_similarity? | Meaning-based search. Pass plain text — vectors auto-generated. |
+| `semantic_search` | query, limit?, min_score? | Smart search with multi-level scoring (title > tags > content). Returns confidence level (HIGH/MEDIUM/LOW/NONE). |
 | `get_note_by_title` | title, fuzzy? | Find by exact or fuzzy title match |
 | `batch_create_notes` | notes[] | Create multiple notes atomically in one call |
 | `append_to_note` | note_id, content | Append without reading/replacing. Use for incremental writes. |
@@ -147,7 +150,7 @@ In Claude Code, use `@bruin` to reference:
 | `advanced_query` | date_from?, date_to?, tags?, tag_mode?, min_words?, max_words?, search?, state? | Structured multi-filter query |
 | `set_note_state` | note_id, state | Move note through `draft → review → published` |
 | `import_markdown` | paths[] | Bulk import from files or directories |
-| `reindex_embeddings` | note_id? | Re-generate embeddings for all un-indexed notes or a specific note |
+| `reindex_embeddings` | note_id? | No-op (search uses keyword matching, not embeddings). Kept for API compatibility. |
 
 ### Knowledge Graph (3 tools)
 
@@ -220,6 +223,17 @@ In Claude Code, use `@bruin` to reference:
 | `get_all_settings` | — | Dump all settings |
 | `export_note_markdown` | note_id | Export with YAML frontmatter |
 | `export_note_html` | note_id | Export as HTML |
+
+### Wiki Knowledge Base (6 tools)
+
+| Tool | Parameters | Use when |
+|------|-----------|---------|
+| `wiki_ingest_source` | title, content, url? | Register raw source material (deduplicates by SHA-256 content hash) |
+| `wiki_link_source_pages` | source_id, note_ids[] | Link wiki pages to their source after batch creation |
+| `wiki_get_index` | tag? | Get structured index of all wiki pages with link counts and previews |
+| `wiki_lint` | — | Health check: orphan pages, missing pages, stale content, stats |
+| `wiki_get_source` | source_id | Get source by ID with linked pages |
+| `wiki_list_sources` | limit?, offset? | List ingested sources with page counts |
 
 ### Utility (3 tools)
 
@@ -329,7 +343,7 @@ Tags are auto-extracted from `#hashtag` patterns in note content. Or pass explic
 |-------|-----|
 | `app is damaged` or CLI flags exit 137 | `find /Applications/Bruin.app -exec xattr -c {} \; 2>/dev/null && codesign --force --sign - /Applications/Bruin.app/Contents/MacOS/bruin` |
 | MCP server not found | Make sure Bruin.app is running first (`--mcp-proxy` connects to the running app) |
-| Semantic search returns nothing | Run `reindex_embeddings()` to index existing notes |
+| Semantic search returns nothing | Try different keywords — search uses FTS5 + multi-level scoring, not embeddings |
 | Notes not showing in app | App and MCP server share the same SQLite file — check that Bruin app is running |
 | Agent ID resets on restart | Set `BRUIN_AGENT_NAME` env var in MCP config |
 
