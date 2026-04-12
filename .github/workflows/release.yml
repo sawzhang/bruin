@@ -43,9 +43,6 @@ jobs:
           workspaces: src-tauri
           key: ${{ matrix.target }}
 
-      - name: Build MCP server
-        run: cd mcp-server && npm ci && npm run build
-
       - name: Build and release
         uses: tauri-apps/tauri-action@v0
         env:

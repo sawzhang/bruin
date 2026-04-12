@@ -17,30 +17,26 @@ npm run test:watch             # Watch mode
 cd src-tauri && cargo check    # Type check Rust
 cd src-tauri && cargo clippy   # Lint Rust
 
-# MCP server
-cd mcp-server && npm install   # Install deps (required before build)
-cd mcp-server && npm run build # Build TypeScript → dist/
-cd mcp-server && npm test      # Run 96 tests (Vitest)
-
-# MCP server CLI
-npx bruin-mcp-server --help           # Show setup instructions
-npx bruin-mcp-server --install-skill  # Install Claude Code skill to ~/.claude/skills/
+# MCP server (built into the app binary)
+/Applications/Bruin.app/Contents/MacOS/bruin --mcp            # Start MCP server (stdio)
+/Applications/Bruin.app/Contents/MacOS/bruin --install-skill   # Install Claude Code skill
+/Applications/Bruin.app/Contents/MacOS/bruin --write-config    # Write Claude Code MCP config
 ```
 
 ## Architecture
 
-Bruin is a Tauri 2 desktop app: Rust backend + React 19 frontend + a separate MCP server.
+Bruin is a Tauri 2 desktop app: Rust backend + React 19 frontend with a native MCP server built into the app binary.
 
 ### Data flow
 
 ```
-AI Agent ──MCP (stdio)──► MCP Server (Node.js) ──► SQLite ◄── Rust Backend ◄──IPC──► React Frontend
+AI Agent ──MCP (stdio)──► Bruin Binary (Rust) ──► SQLite ◄──IPC──► React Frontend
                                                       │
                                                  iCloud Sync
                                               (bidirectional .md files)
 ```
 
-All three processes share the same SQLite database at `~/Library/Application Support/com.bruin.app/bruin.db`. The MCP server notifies Tauri of changes by writing a trigger file that Tauri's file watcher detects.
+The MCP server runs as the same binary with `--mcp` flag: `bruin --mcp`. It accesses SQLite directly — no Node.js required. The GUI app and MCP server share the same database at `~/Library/Application Support/com.bruin.notes/bruin.db`.
 
 ### Frontend (src/)
 
@@ -57,19 +53,18 @@ All three processes share the same SQLite database at `~/Library/Application Sup
 - **Sync**: `sync/` — three layers: `icloud.rs` (file I/O, hash computation), `reconciler.rs` (merge strategy using SHA-256 + last-write-wins), `watcher.rs` (notify crate with debounced events).
 - **DB access pattern**: All commands receive `State<'_, Mutex<Connection>>` via Tauri managed state. Lock the mutex, do work, return `Result<T, String>`.
 
-### MCP Server (mcp-server/)
+### MCP Server (src-tauri/src/mcp/)
 
-- `src/server.ts` — registers **60 tools + 4 resources + 4 prompts** with `@modelcontextprotocol/sdk`.
-- `src/db/queries.ts` — all database operations (~1100 LOC). Uses `better-sqlite3` for synchronous access.
-- `src/embeddings.ts` — local embedding generation using `@huggingface/transformers` (all-MiniLM-L6-v2, 384-dim).
-- `src/index.ts` — CLI entry point. Handles `--help`, `--install-skill`, and agent auto-restore from env vars.
-- `src/tools/` — individual tool handler files.
-- After writes, calls `notifyTauri()` which writes `.bruin-sync-trigger` to wake Tauri's watcher.
+The MCP server is built natively into the Tauri binary — no Node.js required. It runs via `bruin --mcp` (stdio) or as a Unix socket server when the GUI app is running.
+
+- `server.rs` — all tool/prompt/resource handlers + JSON-RPC dispatch (~4100 LOC)
+- `socket_server.rs` — Unix socket listener for `--mcp-proxy` mode
+- `mod.rs` — module exports
 
 **MCP Primitives:**
-- **60 Tools** across: notes/search, knowledge graph, agent registry, workspaces, tasks, workflows, webhooks, settings/export, utility
+- **64 Tools** across: notes/search, knowledge graph, wiki KB, agent registry, workspaces, tasks, workflows, webhooks, templates, settings/export
 - **4 Resources**: `bruin://notes`, `bruin://notes/{id}`, `bruin://tags`, `bruin://daily`
-- **4 Prompts**: `daily_log`, `research_capture`, `weekly_review`, `link_knowledge`
+- **7 Prompts**: `daily_log`, `research_capture`, `weekly_review`, `link_knowledge`, `wiki_ingest`, `wiki_query`, `wiki_lint_and_fix`
 
 ### Key patterns
 
@@ -80,15 +75,15 @@ All three processes share the same SQLite database at `~/Library/Application Sup
 - **UTF-8 safe slicing**: When truncating content for previews, always use `is_char_boundary()` loop before slicing (multi-byte characters like Chinese/emoji will panic otherwise).
 - **Sync state**: `SyncState` (managed Tauri state) must be updated after any sync path — startup reconcile, watcher events, and manual trigger — or the UI shows "Not synced".
 - **Optimistic locking**: `updateNote()` accepts `expectedUpdatedAt`. If the note was updated by another writer since the caller last read it, the write throws a conflict error. MCP tool exposes this as `expected_updated_at`.
-- **Auto-embedding**: `create_note` and `update_note` fire-and-forget `generateEmbedding()` in the background. `reindex_embeddings` tool catches up any notes that missed this.
 - **Per-agent daily notes**: `getDailyNote(date?, agentId?)` scopes the daily note to the agent when `agentId` is provided (title: `YYYY-MM-DD [agentId]`, tagged `#agent/<agentId>`).
 - **Persistent agent identity**: MCP server reads `BRUIN_AGENT_NAME` (or `BRUIN_AGENT_ID`) env var on startup and calls `setCurrentAgent()`. Agent is auto-created if name is new. All subsequent writes are attributed to this agent without needing `register_agent` or `set_current_agent` in every session.
+- **Wiki knowledge base**: Karpathy-style LLM wiki pattern. Sources tracked in `wiki_sources` table, pages linked via `wiki_source_pages`. Tools: `wiki_ingest_source`, `wiki_get_index`, `wiki_lint`. Prompts guide AI through ingest/query/lint workflows.
 
 ## Database
 
 SQLite with WAL mode. FTS5 virtual table `notes_fts` auto-syncs via triggers. Migrations run sequentially on app startup in `db/migrations.rs`. Add new migrations as the next phase number.
 
-The MCP server accesses the same database file. Both use WAL mode for concurrent reads. Concurrent writes to the same note should use `expected_updated_at` optimistic locking.
+The MCP server (`bruin --mcp`) accesses the same database file. Both use WAL mode for concurrent reads. Concurrent writes to the same note should use `expected_updated_at` optimistic locking.
 
 ## iCloud Sync
 
@@ -118,5 +113,5 @@ git push origin master --tags
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`): Runs on push/PR to `master`. Frontend type check + tests, MCP server tests, Rust check + clippy.
+- **CI** (`.github/workflows/ci.yml`): Runs on push/PR to `master`. Frontend type check + tests, Rust check + clippy.
 - **Release** (`.github/workflows/release.yml`): Triggered by `v*` tags. Builds Mac `.dmg` for both `aarch64-apple-darwin` and `x86_64-apple-darwin` via `tauri-apps/tauri-action`. Auto-publishes (not draft). Supports Apple code signing via repository secrets.

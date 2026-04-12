@@ -31,30 +31,6 @@ jobs:
       - name: Run tests
         run: npm test
 
-  test-mcp:
-    name: MCP Server Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: mcp-server/package-lock.json
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y python3 build-essential
-
-      - name: Install dependencies
-        run: cd mcp-server && npm ci
-
-      - name: Type check
-        run: cd mcp-server && npx tsc --noEmit
-
-      - name: Run tests
-        run: cd mcp-server && npm test
-
   test-e2e:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
@@ -110,7 +86,7 @@ jobs:
 
   build-tauri:
     name: Build (${{ matrix.platform }})
-    needs: [test-frontend, test-mcp, check-rust]
+    needs: [test-frontend, check-rust]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     strategy:
       fail-fast: false
@@ -148,9 +124,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
-      - name: Build MCP server
-        run: cd mcp-server && npm ci && npm run build
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

@@ -5,6 +5,26 @@ All notable changes to Bruin will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-04-12
+
+### Added
+- **Wiki Knowledge Base**: Karpathy-style LLM wiki pattern — AI agents can ingest raw sources, decompose them into cross-linked wiki pages, query the knowledge base, and run health checks
+  - 6 wiki tools: `wiki_ingest_source`, `wiki_link_source_pages`, `wiki_get_index`, `wiki_lint`, `wiki_get_source`, `wiki_list_sources`
+  - 3 wiki prompts: `wiki_ingest`, `wiki_query`, `wiki_lint_and_fix`
+  - Database tables: `wiki_sources` + `wiki_source_pages` (Phase 16 migration)
+- **Native Rust MCP server**: complete rewrite of MCP server from Node.js to Rust, built into the app binary — no Node.js required
+  - 66 tools (was 29), 7 prompts (was 4), 4 resources
+  - 37 new tool implementations: batch operations, templates, webhooks, workflows, wiki KB, agent management, import/export, knowledge graph
+- **Smart semantic search**: FTS5 + multi-level scoring (title 10x > tags 6x > content), coverage penalty, confidence levels (HIGH/MEDIUM/LOW/NONE) — no embeddings or ONNX model needed
+- **Wiki-link sync in Rust MCP**: `[[wiki-links]]` now properly populate `note_links` table from all MCP tool paths (was missing in Rust)
+
+### Removed
+- **Node.js MCP server** (`mcp-server/` directory): entirely replaced by native Rust implementation. Users no longer need Node.js installed. Configure with `bruin --mcp` instead of `npx bruin-mcp-server`
+
+### Changed
+- CI workflows no longer build/test the Node.js MCP server
+- CLAUDE.md updated to reflect native MCP architecture
+
 ## [1.1.3] - 2026-03-26
 
 ### Changed

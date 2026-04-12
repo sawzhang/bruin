@@ -37,9 +37,6 @@ jobs:
           workspaces: src-tauri
           key: universal-apple-darwin
 
-      - name: Build MCP server
-        run: cd mcp-server && npm ci && npm run build
-
       - name: Import signing certificates
         env:
           APP_CERTIFICATE_BASE64: ${{ secrets.MAS_APP_CERTIFICATE_BASE64 }}
