@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -1776,4 +1777,251 @@ export function executeWorkflow(id: string): WorkflowStepResult[] {
   }
 
   return stepResults;
+}
+
+// --- Wiki Knowledge Base ---
+
+export interface WikiSourceRow {
+  id: string;
+  title: string;
+  url: string | null;
+  content_hash: string;
+  raw_content: string;
+  ingested_at: string;
+  workspace_id: string | null;
+}
+
+export function createWikiSource(
+  title: string,
+  rawContent: string,
+  url?: string
+): WikiSourceRow {
+  const id = uuidv4();
+  const contentHash = crypto.createHash("sha256").update(rawContent).digest("hex");
+
+  // Check for duplicate
+  const existing = db.prepare(
+    "SELECT id, title FROM wiki_sources WHERE content_hash = ?"
+  ).get(contentHash) as { id: string; title: string } | undefined;
+
+  if (existing) {
+    throw new Error(
+      `Duplicate source: content matches existing source '${existing.title}' (id: ${existing.id}). ` +
+      `Use wiki_get_source to view it.`
+    );
+  }
+
+  const timestamp = now();
+  db.prepare(
+    `INSERT INTO wiki_sources (id, title, url, content_hash, raw_content, ingested_at, workspace_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, title, url ?? null, contentHash, rawContent, timestamp, currentWorkspaceId);
+
+  logActivity("agent", "wiki_source_created", null, `Ingested wiki source '${title}'`);
+  notifyTauri();
+
+  return {
+    id,
+    title,
+    url: url ?? null,
+    content_hash: contentHash,
+    raw_content: rawContent,
+    ingested_at: timestamp,
+    workspace_id: currentWorkspaceId,
+  };
+}
+
+export function linkSourceToPages(
+  sourceId: string,
+  noteIds: string[]
+): { linked: number } {
+  const source = db.prepare("SELECT id FROM wiki_sources WHERE id = ?").get(sourceId) as { id: string } | undefined;
+  if (!source) {
+    throw new Error(`Wiki source '${sourceId}' not found`);
+  }
+
+  let linked = 0;
+  const transaction = db.transaction(() => {
+    for (const noteId of noteIds) {
+      const result = db.prepare(
+        "INSERT OR IGNORE INTO wiki_source_pages (source_id, note_id) VALUES (?, ?)"
+      ).run(sourceId, noteId);
+      linked += result.changes;
+    }
+  });
+  transaction();
+
+  if (linked > 0) {
+    logActivity("agent", "wiki_pages_linked", null, `Linked ${linked} pages to source '${sourceId}'`);
+    notifyTauri();
+  }
+
+  return { linked };
+}
+
+export function getWikiSource(
+  sourceId: string
+): (WikiSourceRow & { pages: Array<{ id: string; title: string }> }) | null {
+  const row = db.prepare("SELECT * FROM wiki_sources WHERE id = ?").get(sourceId) as WikiSourceRow | undefined;
+  if (!row) return null;
+
+  const pages = db.prepare(
+    `SELECT n.id, n.title FROM notes n
+     JOIN wiki_source_pages wsp ON wsp.note_id = n.id
+     WHERE wsp.source_id = ?`
+  ).all(sourceId) as Array<{ id: string; title: string }>;
+
+  return { ...row, pages };
+}
+
+export function listWikiSources(
+  limit = 20,
+  offset = 0
+): Array<{ id: string; title: string; url: string | null; ingested_at: string; page_count: number }> {
+  const wsFilter = currentWorkspaceId !== null;
+  const wsClause = wsFilter ? "WHERE ws.workspace_id = ?" : "";
+  const params = wsFilter
+    ? [currentWorkspaceId, limit, offset]
+    : [limit, offset];
+
+  return db.prepare(
+    `SELECT ws.id, ws.title, ws.url, ws.ingested_at,
+       (SELECT COUNT(*) FROM wiki_source_pages wsp WHERE wsp.source_id = ws.id) as page_count
+     FROM wiki_sources ws
+     ${wsClause}
+     ORDER BY ws.ingested_at DESC
+     LIMIT ? OFFSET ?`
+  ).all(...params) as Array<{ id: string; title: string; url: string | null; ingested_at: string; page_count: number }>;
+}
+
+export function getSourcesForPage(
+  noteId: string
+): Array<{ id: string; title: string; url: string | null; ingested_at: string }> {
+  return db.prepare(
+    `SELECT ws.id, ws.title, ws.url, ws.ingested_at
+     FROM wiki_sources ws
+     JOIN wiki_source_pages wsp ON wsp.source_id = ws.id
+     WHERE wsp.note_id = ?`
+  ).all(noteId) as Array<{ id: string; title: string; url: string | null; ingested_at: string }>;
+}
+
+export function generateWikiIndex(
+  tag = "wiki"
+): Array<{
+  id: string;
+  title: string;
+  preview: string;
+  tags: string[];
+  backlink_count: number;
+  forward_link_count: number;
+  updated_at: string;
+}> {
+  const wsFilter = currentWorkspaceId !== null;
+  const wsClause = wsFilter ? "AND n.workspace_id = ?" : "";
+  const tagPattern = `${tag}%`;
+  const params = wsFilter ? [tagPattern, currentWorkspaceId] : [tagPattern];
+
+  const rows = db.prepare(
+    `SELECT DISTINCT n.id, n.title, SUBSTR(n.content, 1, 200) as preview, n.updated_at,
+       (SELECT COUNT(*) FROM note_links WHERE target_note_id = n.id) as backlink_count,
+       (SELECT COUNT(*) FROM note_links WHERE source_note_id = n.id) as forward_link_count
+     FROM notes n
+     JOIN note_tags nt ON nt.note_id = n.id
+     JOIN tags t ON t.id = nt.tag_id
+     WHERE t.name LIKE ? AND n.is_trashed = 0 ${wsClause}
+     ORDER BY n.title`
+  ).all(...params) as Array<{
+    id: string;
+    title: string;
+    preview: string;
+    updated_at: string;
+    backlink_count: number;
+    forward_link_count: number;
+  }>;
+
+  return rows.map((row) => ({
+    ...row,
+    tags: getTagsForNote(row.id),
+  }));
+}
+
+export function wikiLint(): {
+  orphan_pages: Array<{ id: string; title: string }>;
+  missing_pages: string[];
+  stale_pages: Array<{ id: string; title: string; updated_at: string; days_stale: number }>;
+  stats: { total_pages: number; total_links: number; total_sources: number };
+} {
+  // Get all wiki-tagged note IDs
+  const wikiNotes = db.prepare(
+    `SELECT DISTINCT n.id, n.title, n.content, n.updated_at
+     FROM notes n
+     JOIN note_tags nt ON nt.note_id = n.id
+     JOIN tags t ON t.id = nt.tag_id
+     WHERE t.name LIKE 'wiki%' AND n.is_trashed = 0`
+  ).all() as Array<{ id: string; title: string; content: string; updated_at: string }>;
+
+  const wikiNoteIds = new Set(wikiNotes.map((n) => n.id));
+  const wikiNoteTitles = new Set(wikiNotes.map((n) => n.title));
+
+  // 1. Orphan pages: wiki notes with no links in or out
+  const orphanPages: Array<{ id: string; title: string }> = [];
+  for (const note of wikiNotes) {
+    const hasOutgoing = db.prepare(
+      "SELECT 1 FROM note_links WHERE source_note_id = ? LIMIT 1"
+    ).get(note.id);
+    const hasIncoming = db.prepare(
+      "SELECT 1 FROM note_links WHERE target_note_id = ? LIMIT 1"
+    ).get(note.id);
+    if (!hasOutgoing && !hasIncoming) {
+      orphanPages.push({ id: note.id, title: note.title });
+    }
+  }
+
+  // 2. Missing pages: [[wiki-links]] that reference non-existent titles
+  const allLinkedTitles = new Set<string>();
+  for (const note of wikiNotes) {
+    const links = extractWikiLinks(note.content);
+    for (const link of links) {
+      allLinkedTitles.add(link);
+    }
+  }
+  const existingTitles = new Set(
+    (db.prepare(
+      "SELECT title FROM notes WHERE is_trashed = 0"
+    ).all() as Array<{ title: string }>).map((r) => r.title)
+  );
+  const missingPages = Array.from(allLinkedTitles).filter((t) => !existingTitles.has(t));
+
+  // 3. Stale pages: not updated in 30+ days
+  const stalePages = db.prepare(
+    `SELECT DISTINCT n.id, n.title, n.updated_at,
+       CAST(julianday('now') - julianday(n.updated_at) AS INTEGER) as days_stale
+     FROM notes n
+     JOIN note_tags nt ON nt.note_id = n.id
+     JOIN tags t ON t.id = nt.tag_id
+     WHERE t.name LIKE 'wiki%' AND n.is_trashed = 0
+       AND julianday('now') - julianday(n.updated_at) > 30
+     ORDER BY n.updated_at ASC`
+  ).all() as Array<{ id: string; title: string; updated_at: string; days_stale: number }>;
+
+  // 4. Stats
+  const totalLinks = (db.prepare(
+    `SELECT COUNT(*) as cnt FROM note_links
+     WHERE source_note_id IN (SELECT DISTINCT n.id FROM notes n JOIN note_tags nt ON nt.note_id = n.id JOIN tags t ON t.id = nt.tag_id WHERE t.name LIKE 'wiki%' AND n.is_trashed = 0)`
+  ).get() as { cnt: number }).cnt;
+
+  const totalSources = (db.prepare(
+    "SELECT COUNT(*) as cnt FROM wiki_sources"
+  ).get() as { cnt: number }).cnt;
+
+  return {
+    orphan_pages: orphanPages,
+    missing_pages: missingPages,
+    stale_pages: stalePages,
+    stats: {
+      total_pages: wikiNotes.length,
+      total_links: totalLinks,
+      total_sources: totalSources,
+    },
+  };
 }

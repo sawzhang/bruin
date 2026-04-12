@@ -452,6 +452,30 @@ pub fn run_migrations(app_handle: &AppHandle) -> Result<(), Box<dyn std::error::
         conn.execute_batch("ALTER TABLE tags ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;")?;
     }
 
+    // Phase 16: Wiki Sources
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS wiki_sources (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            url TEXT,
+            content_hash TEXT NOT NULL,
+            raw_content TEXT NOT NULL,
+            ingested_at TEXT NOT NULL,
+            workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS wiki_source_pages (
+            source_id TEXT NOT NULL REFERENCES wiki_sources(id) ON DELETE CASCADE,
+            note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+            PRIMARY KEY (source_id, note_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_wiki_sources_hash ON wiki_sources(content_hash);
+        CREATE INDEX IF NOT EXISTS idx_wiki_source_pages_note ON wiki_source_pages(note_id);
+        ",
+    )?;
+
     app_handle.manage(Mutex::new(conn));
 
     Ok(())

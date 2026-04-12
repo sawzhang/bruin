@@ -299,6 +299,28 @@ function ensureDatabase(): Database.Database {
     );
   `);
 
+  // Phase 16: Wiki Sources
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wiki_sources (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      url TEXT,
+      content_hash TEXT NOT NULL,
+      raw_content TEXT NOT NULL,
+      ingested_at TEXT NOT NULL,
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS wiki_source_pages (
+      source_id TEXT NOT NULL REFERENCES wiki_sources(id) ON DELETE CASCADE,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      PRIMARY KEY (source_id, note_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_wiki_sources_hash ON wiki_sources(content_hash);
+    CREATE INDEX IF NOT EXISTS idx_wiki_source_pages_note ON wiki_source_pages(note_id);
+  `);
+
   // Settings KV store
   db.exec(`
     CREATE TABLE IF NOT EXISTS settings (

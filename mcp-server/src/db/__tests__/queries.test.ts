@@ -178,6 +178,25 @@ function createTestDb(): Database.Database {
       created_at TEXT NOT NULL,
       PRIMARY KEY (agent_id, workspace_id)
     );
+
+    CREATE TABLE IF NOT EXISTS wiki_sources (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      url TEXT,
+      content_hash TEXT NOT NULL,
+      raw_content TEXT NOT NULL,
+      ingested_at TEXT NOT NULL,
+      workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS wiki_source_pages (
+      source_id TEXT NOT NULL REFERENCES wiki_sources(id) ON DELETE CASCADE,
+      note_id TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+      PRIMARY KEY (source_id, note_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_wiki_sources_hash ON wiki_sources(content_hash);
+    CREATE INDEX IF NOT EXISTS idx_wiki_source_pages_note ON wiki_source_pages(note_id);
   `);
 
   return db;
@@ -1188,5 +1207,194 @@ describe("agentWorkspaceBinding", () => {
     const agent = registerAgent("lonely-agent");
     const workspaces = getAgentWorkspaces(agent.id);
     expect(workspaces).toEqual([]);
+  });
+});
+
+// --- Wiki Knowledge Base ---
+
+describe("createWikiSource", () => {
+  it("creates source with content hash", async () => {
+    const { createWikiSource } = await getQueries();
+    const source = createWikiSource("Test Article", "Some raw content about AI", "https://example.com/article");
+    expect(source.id).toBeTruthy();
+    expect(source.title).toBe("Test Article");
+    expect(source.url).toBe("https://example.com/article");
+    expect(source.content_hash).toBeTruthy();
+    expect(source.content_hash.length).toBe(64); // SHA-256 hex
+    expect(source.raw_content).toBe("Some raw content about AI");
+    expect(source.ingested_at).toBeTruthy();
+  });
+
+  it("rejects duplicate content", async () => {
+    const { createWikiSource } = await getQueries();
+    createWikiSource("Article 1", "Duplicate content");
+    expect(() => createWikiSource("Article 2", "Duplicate content")).toThrow(/Duplicate source/);
+  });
+
+  it("allows different content with same title", async () => {
+    const { createWikiSource } = await getQueries();
+    const s1 = createWikiSource("Same Title", "Content A");
+    const s2 = createWikiSource("Same Title", "Content B");
+    expect(s1.id).not.toBe(s2.id);
+  });
+
+  it("stores null url when not provided", async () => {
+    const { createWikiSource } = await getQueries();
+    const source = createWikiSource("No URL", "Some content");
+    expect(source.url).toBeNull();
+  });
+});
+
+describe("linkSourceToPages", () => {
+  it("links source to multiple pages", async () => {
+    const { createWikiSource, createNote, linkSourceToPages } = await getQueries();
+    const source = createWikiSource("Source", "Raw content");
+    const note1 = createNote("Page 1", "Content 1");
+    const note2 = createNote("Page 2", "Content 2");
+    const result = linkSourceToPages(source.id, [note1.id, note2.id]);
+    expect(result.linked).toBe(2);
+  });
+
+  it("ignores duplicate links", async () => {
+    const { createWikiSource, createNote, linkSourceToPages } = await getQueries();
+    const source = createWikiSource("Source", "Raw content");
+    const note = createNote("Page", "Content");
+    linkSourceToPages(source.id, [note.id]);
+    const result = linkSourceToPages(source.id, [note.id]);
+    expect(result.linked).toBe(0);
+  });
+
+  it("throws for non-existent source", async () => {
+    const { linkSourceToPages } = await getQueries();
+    expect(() => linkSourceToPages("non-existent", ["note-id"])).toThrow(/not found/);
+  });
+});
+
+describe("getWikiSource", () => {
+  it("returns source with linked pages", async () => {
+    const { createWikiSource, createNote, linkSourceToPages, getWikiSource } = await getQueries();
+    const source = createWikiSource("Source", "Raw content");
+    const note = createNote("Wiki Page", "Content");
+    linkSourceToPages(source.id, [note.id]);
+    const result = getWikiSource(source.id);
+    expect(result).not.toBeNull();
+    expect(result!.title).toBe("Source");
+    expect(result!.pages.length).toBe(1);
+    expect(result!.pages[0].title).toBe("Wiki Page");
+  });
+
+  it("returns null for non-existent source", async () => {
+    const { getWikiSource } = await getQueries();
+    expect(getWikiSource("non-existent")).toBeNull();
+  });
+});
+
+describe("listWikiSources", () => {
+  it("lists sources with correct count", async () => {
+    const { createWikiSource, listWikiSources } = await getQueries();
+    createWikiSource("First", "Content A");
+    createWikiSource("Second", "Content B");
+    const sources = listWikiSources();
+    expect(sources.length).toBe(2);
+    const titles = sources.map((s: { title: string }) => s.title);
+    expect(titles).toContain("First");
+    expect(titles).toContain("Second");
+  });
+
+  it("includes page count", async () => {
+    const { createWikiSource, createNote, linkSourceToPages, listWikiSources } = await getQueries();
+    const source = createWikiSource("Source", "Raw content");
+    const note1 = createNote("Page 1", "Content");
+    const note2 = createNote("Page 2", "Content");
+    linkSourceToPages(source.id, [note1.id, note2.id]);
+    const sources = listWikiSources();
+    expect(sources[0].page_count).toBe(2);
+  });
+
+  it("respects limit and offset", async () => {
+    const { createWikiSource, listWikiSources } = await getQueries();
+    createWikiSource("A", "Content 1");
+    createWikiSource("B", "Content 2");
+    createWikiSource("C", "Content 3");
+    const page1 = listWikiSources(2, 0);
+    expect(page1.length).toBe(2);
+    const page2 = listWikiSources(2, 2);
+    expect(page2.length).toBe(1);
+  });
+});
+
+describe("getSourcesForPage", () => {
+  it("returns sources linked to a page", async () => {
+    const { createWikiSource, createNote, linkSourceToPages, getSourcesForPage } = await getQueries();
+    const source = createWikiSource("Source", "Raw content");
+    const note = createNote("Page", "Content");
+    linkSourceToPages(source.id, [note.id]);
+    const sources = getSourcesForPage(note.id);
+    expect(sources.length).toBe(1);
+    expect(sources[0].title).toBe("Source");
+  });
+
+  it("returns empty array for unlinked page", async () => {
+    const { createNote, getSourcesForPage } = await getQueries();
+    const note = createNote("Orphan", "Content");
+    expect(getSourcesForPage(note.id)).toEqual([]);
+  });
+});
+
+describe("generateWikiIndex", () => {
+  it("returns wiki-tagged notes with link counts", async () => {
+    const { createNote, generateWikiIndex } = await getQueries();
+    createNote("React", "A JavaScript UI library. See also [[Vue]]", ["wiki", "wiki/concept"]);
+    createNote("Vue", "A progressive JS framework. See also [[React]]", ["wiki", "wiki/concept"]);
+    const index = generateWikiIndex();
+    expect(index.length).toBe(2);
+    expect(index[0].tags).toContain("wiki");
+    expect(index[0].backlink_count).toBeGreaterThanOrEqual(0);
+    expect(index[0].forward_link_count).toBeGreaterThanOrEqual(0);
+  });
+
+  it("filters by tag prefix", async () => {
+    const { createNote, generateWikiIndex } = await getQueries();
+    createNote("Concept A", "Content", ["wiki/concept"]);
+    createNote("Person B", "Content", ["wiki/person"]);
+    const concepts = generateWikiIndex("wiki/concept");
+    expect(concepts.length).toBe(1);
+    expect(concepts[0].title).toBe("Concept A");
+  });
+
+  it("excludes trashed notes", async () => {
+    const { createNote, deleteNote, generateWikiIndex } = await getQueries();
+    const note = createNote("Trashed", "Content", ["wiki"]);
+    deleteNote(note.id);
+    const index = generateWikiIndex();
+    expect(index.length).toBe(0);
+  });
+});
+
+describe("wikiLint", () => {
+  it("detects orphan pages (no links)", async () => {
+    const { createNote, wikiLint } = await getQueries();
+    createNote("Orphan", "No links here", ["wiki"]);
+    const report = wikiLint();
+    expect(report.orphan_pages.length).toBe(1);
+    expect(report.orphan_pages[0].title).toBe("Orphan");
+  });
+
+  it("detects missing pages (referenced but don't exist)", async () => {
+    const { createNote, wikiLint } = await getQueries();
+    createNote("Referrer", "Check out [[NonExistent Page]]", ["wiki"]);
+    const report = wikiLint();
+    expect(report.missing_pages).toContain("NonExistent Page");
+  });
+
+  it("returns correct stats", async () => {
+    const { createNote, createWikiSource, wikiLint } = await getQueries();
+    createNote("Page A", "See [[Page B]]", ["wiki"]);
+    createNote("Page B", "Content", ["wiki"]);
+    createWikiSource("Source", "Raw");
+    const report = wikiLint();
+    expect(report.stats.total_pages).toBe(2);
+    expect(report.stats.total_sources).toBe(1);
+    expect(report.stats.total_links).toBeGreaterThanOrEqual(0);
   });
 });

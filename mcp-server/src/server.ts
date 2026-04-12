@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { generateEmbedding } from "./embeddings.js";
-import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, executeWorkflow, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces, unbindAgentWorkspace, updateAgent, deactivateAgent, deleteWorkflowTemplate, pinNote, restoreNote, getSetting, setSetting, getAllSettings, exportNoteMarkdown, exportNoteHtml } from "./db/queries.js";
+import { createNote, getNote, getNoteByTitle, updateNote, deleteNote, setNoteState, listNotes, searchNotes, listTags, batchCreateNotes, appendToNote, getBacklinks, getDailyNote, advancedQuery, importMarkdownFiles, getActivityFeed, listTemplates, createNoteFromTemplate, registerWebhook, listWebhooks, deleteWebhook, createWorkspace, listWorkspaces, deleteWorkspace, setCurrentWorkspace, getCurrentWorkspace, getForwardLinks, getKnowledgeGraph, semanticSearch, upsertNoteEmbedding, getAllEmbeddings, registerAgent, listAgents, getAgent, getAgentAuditLog, setCurrentAgent, getCurrentAgent, createTask, listTasks, updateTask, completeTask, assignTask, listWorkflowTemplates, getWorkflowTemplate, createWorkflowTemplate, executeWorkflow, updateWebhook, testWebhook, getWebhookLogs, bindAgentWorkspace, getAgentWorkspaces, unbindAgentWorkspace, updateAgent, deactivateAgent, deleteWorkflowTemplate, pinNote, restoreNote, getSetting, setSetting, getAllSettings, exportNoteMarkdown, exportNoteHtml, createWikiSource, linkSourceToPages, getWikiSource, listWikiSources, getSourcesForPage, generateWikiIndex, wikiLint } from "./db/queries.js";
 
 function text(data: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
@@ -191,6 +191,65 @@ export function createServer(): McpServer {
           content: {
             type: "text" as const,
             text: `Build knowledge graph connections in Bruin.\n\n${context || "Start with recent notes using list_notes."}\n\nSteps:\n1. Read the target note(s)\n2. Use search_notes or semantic_search to find related notes by concept\n3. Use get_backlinks to see existing connections\n4. Update notes to add [[wiki-links]] where meaningful connections exist\n5. Report: how many links were added and what knowledge clusters emerged`,
+          },
+        }],
+      };
+    }
+  );
+
+  // --- Wiki Knowledge Base Prompts ---
+
+  server.prompt(
+    "wiki_ingest",
+    "Ingest raw content into the wiki — decompose a source into structured wiki pages with cross-links",
+    {
+      title: z.string().describe("Title of the source material"),
+      content: z.string().describe("Raw content to decompose into wiki pages"),
+      url: z.string().optional().describe("Source URL if applicable"),
+    },
+    async (args) => {
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Ingest the following source into the Bruin wiki.\n\n## Source\nTitle: ${args.title}\n${args.url ? `URL: ${args.url}\n` : ""}Content:\n${args.content}\n\n## Instructions\n\nFollow these steps:\n\n1. **Register the source**: Call wiki_ingest_source with the title, content${args.url ? ", and URL" : ""}.\n\n2. **Analyze the content**: Identify 5-15 discrete concepts, entities, or topics that deserve their own wiki page. Think about:\n   - Key concepts and definitions\n   - People mentioned\n   - Technologies or tools\n   - Processes or workflows\n   - Relationships between entities\n\n3. **Check existing pages**: For each concept, use get_note_by_title (fuzzy=true) to check if a wiki page already exists. If it does, plan to UPDATE it rather than create a duplicate.\n\n4. **Create new pages**: Use batch_create_notes to create all new wiki pages in one transaction. Each page should:\n   - Have a clear, concise title (the concept name)\n   - Start with a one-line definition/summary\n   - Use [[wiki-links]] to reference other pages (both new and existing)\n   - Include tags: #wiki plus a subtype like #wiki/concept, #wiki/person, #wiki/tool, etc.\n   - Be self-contained but cross-referenced\n\n5. **Update existing pages**: For pages that already exist, use update_note to add new information from this source. Append, don't overwrite.\n\n6. **Link source to pages**: Call wiki_link_source_pages with the source_id and all created/updated note IDs.\n\n7. **Report**: Summarize what was created, updated, and linked.\n\n## Quality guidelines\n- Every page should have at least 2 outgoing [[wiki-links]]\n- Prefer short, focused pages over long ones\n- Use consistent naming: "React" not "React.js" or "ReactJS"\n- Add #wiki/stub tag if a page is minimal and needs expansion later`,
+          },
+        }],
+      };
+    }
+  );
+
+  server.prompt(
+    "wiki_query",
+    "Query the wiki knowledge base — search for relevant pages and synthesize an answer",
+    {
+      question: z.string().describe("The question to answer from the wiki"),
+    },
+    async (args) => {
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Answer this question using the Bruin wiki: "${args.question}"\n\n## Instructions\n\n1. **Get the wiki index**: Call wiki_get_index to see all available pages.\n\n2. **Semantic search**: Call semantic_search with the question to find the most relevant pages by meaning.\n\n3. **Full-text search**: Call search_notes with key terms from the question for exact matches.\n\n4. **Read relevant pages**: Use read_note to read the top 3-5 most relevant pages. Follow [[wiki-links]] to read connected pages if needed.\n\n5. **Check backlinks**: For key pages, call get_backlinks to find additional context.\n\n6. **Synthesize**: Provide a comprehensive answer that:\n   - Cites specific wiki pages by title using [[Page Title]] syntax\n   - Distinguishes between what the wiki says and what you infer\n   - Notes if the wiki lacks information on any aspect of the question\n   - Suggests which pages might need updating based on the question`,
+          },
+        }],
+      };
+    }
+  );
+
+  server.prompt(
+    "wiki_lint_and_fix",
+    "Run a health check on the wiki and fix problems — find orphans, missing pages, broken links, and stale content",
+    {},
+    async () => {
+      return {
+        messages: [{
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `Run a health check on the Bruin wiki and fix any problems found.\n\n## Instructions\n\n1. **Run lint**: Call wiki_lint to get the health report.\n\n2. **Fix orphan pages**: For each orphan page (no links in or out):\n   - Read the page content\n   - Use semantic_search to find related pages\n   - Update the orphan to add [[wiki-links]] to related pages\n   - Update related pages to link back if appropriate\n\n3. **Create missing pages**: For each missing page (referenced but doesn't exist):\n   - Read the pages that reference it to understand the expected content\n   - Create a stub page with tag #wiki/stub and [[wiki-links]] back to the referencing pages\n   - Include a note that this page needs expansion\n\n4. **Review stale pages**: For each stale page (not updated in 30+ days):\n   - Read the page\n   - Check if the information appears outdated\n   - Flag for review (add #wiki/needs-review tag) if content may be stale\n\n5. **Report**: Summarize all fixes made:\n   - Orphans connected: N\n   - Stubs created: N\n   - Stale pages flagged: N\n   - Links added: N`,
           },
         }],
       };
@@ -1103,6 +1162,91 @@ export function createServer(): McpServer {
       const html = exportNoteHtml(args.note_id);
       if (!html) return error(`Note '${args.note_id}' not found`);
       return { content: [{ type: "text" as const, text: html }] };
+    }
+  );
+
+  // --- Wiki Knowledge Base Tools ---
+
+  server.tool(
+    "wiki_ingest_source",
+    "Register a raw source for wiki ingestion. Stores the source content, deduplicates by content hash, and returns a source_id. After calling this, use batch_create_notes to create the wiki pages, then wiki_link_source_pages to link them.",
+    {
+      title: z.string().describe("Title/name of the source (e.g. article title, book chapter)"),
+      content: z.string().describe("Raw text content of the source material"),
+      url: z.string().optional().describe("Source URL if applicable"),
+    },
+    async (args) => {
+      try {
+        const source = createWikiSource(args.title, args.content, args.url);
+        return text({ id: source.id, title: source.title, content_hash: source.content_hash, ingested_at: source.ingested_at });
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  server.tool(
+    "wiki_link_source_pages",
+    "Link wiki pages (notes) to their source material. Call after batch_create_notes to record which source produced which pages.",
+    {
+      source_id: z.string().describe("Source ID from wiki_ingest_source"),
+      note_ids: z.array(z.string()).describe("Array of note IDs that were created from this source"),
+    },
+    async (args) => {
+      try {
+        const result = linkSourceToPages(args.source_id, args.note_ids);
+        return text(result);
+      } catch (e: unknown) {
+        return error((e as Error).message);
+      }
+    }
+  );
+
+  server.tool(
+    "wiki_get_index",
+    "Get a structured index of all wiki pages with link counts, tags, and previews. Use for navigating the wiki, generating an index page, or finding pages to read.",
+    {
+      tag: z.string().optional().describe("Tag prefix to filter by (default: 'wiki'). Use 'wiki/concept' to list only concept pages, 'wiki/person' for people, etc."),
+    },
+    async (args) => {
+      const index = generateWikiIndex(args.tag ?? "wiki");
+      return text({ page_count: index.length, pages: index });
+    }
+  );
+
+  server.tool(
+    "wiki_lint",
+    "Health check the wiki. Finds orphan pages (no links in or out), missing pages (referenced via [[]] but don't exist), stale pages (not updated in 30+ days), and overall stats.",
+    {},
+    async () => {
+      const report = wikiLint();
+      return text(report);
+    }
+  );
+
+  server.tool(
+    "wiki_get_source",
+    "Get a wiki source by ID, including its raw content and the pages it generated.",
+    {
+      source_id: z.string().describe("Source ID"),
+    },
+    async (args) => {
+      const source = getWikiSource(args.source_id);
+      if (!source) return error(`Source '${args.source_id}' not found`);
+      return text(source);
+    }
+  );
+
+  server.tool(
+    "wiki_list_sources",
+    "List all ingested wiki sources with page counts, ordered by ingestion date (newest first).",
+    {
+      limit: z.number().optional().describe("Max results (default 20)"),
+      offset: z.number().optional().describe("Pagination offset (default 0)"),
+    },
+    async (args) => {
+      const sources = listWikiSources(args.limit ?? 20, args.offset ?? 0);
+      return text({ count: sources.length, sources });
     }
   );
 
